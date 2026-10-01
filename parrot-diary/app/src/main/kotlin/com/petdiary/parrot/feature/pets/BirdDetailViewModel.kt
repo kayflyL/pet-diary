@@ -1,0 +1,83 @@
+package com.petdiary.parrot.feature.pets
+
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.petdiary.parrot.core.designsystem.BirdAccents
+import com.petdiary.parrot.core.model.SpeciesCatalog
+import com.petdiary.parrot.core.util.AgeFormatter
+import com.petdiary.parrot.data.PetRepository
+import com.petdiary.parrot.data.WeightRepository
+import com.petdiary.parrot.data.local.PetEntity
+import com.petdiary.parrot.data.local.WeightLogEntity
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
+
+@HiltViewModel
+class BirdDetailViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
+    petRepository: PetRepository,
+    weightRepository: WeightRepository,
+) : ViewModel() {
+
+    val petId: String = checkNotNull(savedStateHandle["petId"])
+
+    val bird: StateFlow<PetEntity?> = petRepository.observeById(petId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val latestWeight: StateFlow<WeightLogEntity?> = weightRepository.observeLatest(petId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val recordCount: StateFlow<Int> = weightRepository.observeCount(petId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+}
+
+/** 详情页展示派生数据 */
+data class BirdDetailUi(
+    val name: String,
+    val speciesName: String,
+    val genderText: String,
+    val genderMethodText: String?,
+    val ageText: String?,
+    val companionText: String?,
+    val accent: androidx.compose.ui.graphics.Color,
+    val initial: String,
+    val tags: List<String>,
+    val legBand: String?,
+    val source: String?,
+    val birthText: String?,
+    val gotchaText: String?,
+    val notes: String?,
+    val latestWeightText: String?,
+    val recordCount: Int,
+)
+
+fun detailUi(pet: PetEntity?, latest: WeightLogEntity?, count: Int, todayEpochDay: Long): BirdDetailUi? {
+    pet ?: return null
+    return BirdDetailUi(
+        name = pet.name,
+        speciesName = SpeciesCatalog.nameOf(pet.speciesId),
+        genderText = AgeFormatter.genderLabel(pet.gender),
+        genderMethodText = pet.genderMethod,
+        ageText = AgeFormatter.formatAge(pet.birthDateEpochDay, todayEpochDay),
+        companionText = AgeFormatter.formatCompanion(pet.gotchaDateEpochDay, pet.birthDateEpochDay, todayEpochDay),
+        accent = BirdAccents[pet.accentIndex.coerceIn(BirdAccents.indices)],
+        initial = pet.name.take(1),
+        tags = pet.personalityTagsJson
+            ?.trim('[', ']')
+            ?.split("\",\"")
+            ?.map { it.trim('"') }
+            ?.filter { it.isNotBlank() }
+            ?: emptyList(),
+        legBand = pet.legBand,
+        source = pet.source,
+        birthText = pet.birthDateEpochDay?.let { java.time.LocalDate.ofEpochDay(it).toString() },
+        gotchaText = pet.gotchaDateEpochDay?.let { java.time.LocalDate.ofEpochDay(it).toString() },
+        notes = pet.notes,
+        latestWeightText = latest?.let { "${it.grams} g" },
+        recordCount = count,
+    )
+}

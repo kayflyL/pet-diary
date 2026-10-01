@@ -22,6 +22,9 @@ interface PetDao {
     @Query("SELECT * FROM pets WHERE id = :id")
     suspend fun getById(id: String): PetEntity?
 
+    @Query("SELECT * FROM pets WHERE id = :id")
+    fun observeById(id: String): Flow<PetEntity?>
+
     @Query("SELECT COUNT(*) FROM pets")
     suspend fun count(): Int
 
@@ -39,6 +42,12 @@ interface WeightLogDao {
 
     @Query("SELECT * FROM weight_logs WHERE petId = :petId ORDER BY weighedAt DESC LIMIT 1")
     suspend fun latestForPet(petId: String): WeightLogEntity?
+
+    @Query("SELECT * FROM weight_logs WHERE petId = :petId ORDER BY weighedAt DESC LIMIT 1")
+    fun observeLatestForPet(petId: String): Flow<WeightLogEntity?>
+
+    @Query("SELECT COUNT(*) FROM weight_logs WHERE petId = :petId")
+    fun observeCountForPet(petId: String): Flow<Int>
 
     @Query("SELECT COUNT(*) FROM weight_logs")
     suspend fun count(): Int
@@ -175,4 +184,7 @@ interface AppSettingDao {
 
     @Query("SELECT value FROM app_settings WHERE key = :key")
     suspend fun get(key: String): String?
+
+    @Query("SELECT value FROM app_settings WHERE key = :key")
+    fun observe(key: String): Flow<String?>
 }

@@ -30,6 +30,7 @@ class FoodRepository @Inject constructor(
 @Singleton
 class PetRepository @Inject constructor(private val petDao: PetDao) {
     fun observeActive(): Flow<List<PetEntity>> = petDao.observeActive()
+    fun observeById(id: String): Flow<PetEntity?> = petDao.observeById(id)
     suspend fun getById(id: String): PetEntity? = petDao.getById(id)
     suspend fun count(): Int = petDao.count()
 
@@ -43,6 +44,10 @@ class PetRepository @Inject constructor(private val petDao: PetDao) {
         petDao.upsert(PetEntity(id = id, name = name, speciesId = speciesId, accentIndex = accentIndex, createdAt = now, updatedAt = now))
         return id
     }
+
+    suspend fun insert(pet: PetEntity) = petDao.upsert(pet)
+
+    suspend fun update(pet: PetEntity) = petDao.upsert(pet.copy(updatedAt = System.currentTimeMillis()))
 }
 
 @Singleton
@@ -50,6 +55,8 @@ class WeightRepository @Inject constructor(private val dao: WeightLogDao) {
     /** 3 秒录入：默认值 = 上次体重（APP设计文档.md §3.2） */
     suspend fun latestFor(petId: String): WeightLogEntity? = dao.latestForPet(petId)
     fun observeFor(petId: String): Flow<List<WeightLogEntity>> = dao.observeForPet(petId)
+    fun observeLatest(petId: String): Flow<WeightLogEntity?> = dao.observeLatestForPet(petId)
+    fun observeCount(petId: String): Flow<Int> = dao.observeCountForPet(petId)
 
     suspend fun record(petId: String, grams: Double, at: Long = System.currentTimeMillis(), note: String? = null): String {
         val id = UUID.randomUUID().toString()

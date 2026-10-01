@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>鹦鹉日记 · 原型 v3 · 视觉升级</title>
+<style>
+:root{
+  --bg:#FAFAF9; --card:#FFFFFF; --surface:#F4F4F3; --ink:#191A1C; --sub:#85878C;
+  --line:#EAEAE8; --pri:#2F8F5B; --pri-deep:#256F48; --pri-soft:#EAF3EE;
+  --amber:#B45309; --blue:#5B7FA6; --danger:#C53939;
+  --s1:#EAF3EE; --s2:#D3E8DB; --s3:#2F8F5B;
+  --shadow:0 1px 2px rgba(18,19,20,.04),0 12px 32px -14px rgba(18,19,20,.08);
+}
+[data-theme="dark"]{
+  --bg:#0F1113; --card:#16181B; --surface:#1D2023; --ink:#ECEDEE; --sub:#8F9298;
+  --line:#26292C; --pri:#5BC58E; --pri-deep:#7FD3A2; --pri-soft:#1B2B23;
+  --s1:#1B2B23; --s2:#244636; --s3:#5BC58E;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 32px -14px rgba(0,0,0,.4);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:#141618;font-family:-apple-system,'MiSans','HarmonyOS Sans SC','PingFang SC','Segoe UI',Roboto,sans-serif;color:var(--ink);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:12px}
+#phone{position:relative;width:min(420px,100%);height:min(880px,96vh);background:var(--bg);border-radius:32px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.6);transition:background .25s}
+.screen{position:absolute;inset:0;overflow-y:auto;padding:18px 18px 128px;display:none;scrollbar-width:none}
+.screen.active{display:block;animation:fadein .18s ease-out}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.screen::-webkit-scrollbar{display:none}
+h1{font-size:20px;font-weight:700;letter-spacing:-.2px}
+.ic{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.h-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.iconbtn{width:36px;height:36px;border-radius:12px;border:1px solid var(--line);background:var(--card);cursor:pointer;color:var(--ink);display:flex;align-items:center;justify-content:center}
+.sub{color:var(--sub);font-size:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;margin-bottom:14px;box-shadow:var(--shadow)}
+.chips{display:flex;gap:7px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:6px 13px;border-radius:999px;background:var(--card);font-size:12.5px;border:1px solid var(--line);cursor:pointer;color:var(--sub)}
+.chip.on{background:var(--ink);border-color:var(--ink);color:var(--bg);font-weight:600}
+/* 头像：单字纹章 */
+.av{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;background:var(--pri-soft);color:var(--pri);flex:none}
+.av.y{background:#FBF1DC;color:#B07A16}
+/* 英雄卡 */
+.hero{border-radius:24px;overflow:hidden;position:relative;margin-bottom:16px;height:216px;
+  background:radial-gradient(120% 130% at 88% 8%,rgba(127,211,158,.28),transparent 52%),radial-gradient(130% 120% at 12% 95%,rgba(37,111,72,.85),transparent 58%),linear-gradient(145deg,#0F3527,#1D5C3E)}
+.hero .ring{position:absolute;border-radius:50%;border:1px solid rgba(255,255,255,.14)}
+.hero .r1{width:190px;height:190px;right:-40px;top:-60px}
+.hero .r2{width:120px;height:120px;right:60px;top:70px}
+.hero .mono{position:absolute;right:18px;bottom:6px;font-size:104px;font-weight:800;color:rgba(255,255,255,.08);font-family:Georgia,serif}
+.hero .overlay{position:absolute;inset:auto 0 0 0;padding:16px 18px;color:#fff}
+.hero .nm{font-size:24px;font-weight:800;letter-spacing:-.3px}
+.hero .mt{font-size:12px;opacity:.85;margin-top:3px}
+.hero .chiprow{position:absolute;top:14px;right:14px;display:flex;gap:7px}
+.hero .a{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.16);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;cursor:pointer;border:1.5px solid rgba(255,255,255,.35)}
+.hero .a.on{background:#fff;color:var(--pri-deep);border-color:#fff}
+.hero .stats{display:flex;gap:8px;margin-top:12px}
+.hero .st{flex:1;background:rgba(255,255,255,.12);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:8px 11px}
+.hero .st b{font-size:15.5px;font-variant-numeric:tabular-nums;font-weight:700}
+.hero .st div{font-size:10.5px;opacity:.82;margin-top:1px}
+/* 周条日历 */
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cal-head b{font-size:14.5px;font-weight:700}
+.cal-head .r{display:flex;gap:6px}
+.cal-head button{min-width:28px;height:28px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font-size:12px;padding:0 7px}
+.week{display:flex;gap:6px}
+.wcell{flex:1;border-radius:14px;padding:9px 0 8px;text-align:center;cursor:pointer;border:1.5px solid transparent;transition:.15s}
+.wcell .d{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.wcell .c{font-size:9.5px;color:var(--sub);margin-top:2px}
+.wcell.h1{background:var(--pri-soft)} .wcell.h2{background:#CBE5D6} .wcell.h3{background:var(--pri)}
+.wcell.h3 .d{color:#fff}.wcell.h3 .c{color:#fff;opacity:.85}
+.wcell.today{border-color:var(--pri)}
+.wcell.sel{border-color:var(--ink)}
+.mgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.mgrid .wd{font-size:10.5px;color:var(--sub);padding:2px 0}
+.mday{aspect-ratio:1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;font-variant-numeric:tabular-nums;border:1.5px solid transparent}
+.mday.h1{background:var(--pri-soft)}.mday.h2{background:#CBE5D6}.mday.h3{background:var(--pri);color:#fff}
+.mday.today{border-color:var(--pri);font-weight:700}
+.mday.dim{opacity:.35}
+.ygrid .yr{display:flex;align-items:center;gap:2.5px;margin-bottom:3px}
+.ygrid .yl{width:28px;font-size:10px;color:var(--sub);flex:none}
+.ygrid .yc{width:8.5px;height:8.5px;border-radius:2.5px;background:var(--surface);cursor:pointer}
+.ygrid .yc.h1{background:var(--s1)}.ygrid .yc.h2{background:var(--s2)}.ygrid .yc.h3{background:var(--s3)}
+.legend{display:flex;gap:6px;align-items:center;font-size:11px;color:var(--sub);margin-top:10px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.legend i.l0{border:1px solid var(--line)}.legend i.l1{background:var(--s1)}.legend i.l2{background:var(--s2)}.legend i.l3{background:var(--s3)}
+.day-summary{font-size:12px;color:var(--sub);margin-top:10px}
+.tl-item{display:flex;gap:11px;margin-bottom:10px}
+.tl-ico{width:34px;height:34px;border-radius:11px;background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--ink);flex:none}
+.tl-ico .ic{width:16px;height:16px}
+.tl-body{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.tl-time{color:var(--sub);font-size:11px;margin-top:3px}
+.photos{display:flex;gap:6px;margin-top:8px}
+.ph{flex:1;aspect-ratio:1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px}
+.g1{background:linear-gradient(140deg,#CBE5D6,#7FC79E)}.g2{background:linear-gradient(140deg,#FFE9BE,#F0C25F)}.g3{background:linear-gradient(140deg,#D6E4F2,#9EC0DE)}.g4{background:linear-gradient(140deg,#EFD9C8,#E0A87E)}
+#fab{position:absolute;right:18px;bottom:92px;background:var(--ink);color:var(--bg);border:none;border-radius:17px;padding:0 19px;height:52px;font-size:14.5px;font-weight:700;cursor:pointer;box-shadow:0 10px 26px rgba(18,19,20,.28);z-index:20;display:flex;align-items:center;gap:7px;transition:transform .18s}
+#fab:active{transform:scale(.95)}
+#fab .ic{width:17px;height:17px}
+#tabbar{position:absolute;left:0;right:0;bottom:0;height:72px;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(14px);display:flex;border-top:1px solid var(--line);z-index:15}
+#tabbar button{flex:1;background:none;border:none;font-size:10.5px;color:var(--sub);cursor:pointer;padding-top:10px;display:flex;flex-direction:column;align-items:center;gap:3px;font-weight:500}
+#tabbar button.on{color:var(--ink);font-weight:700}
+.sheet-wrap{position:absolute;inset:0;z-index:30;display:none}
+.sheet-wrap.show{display:block}
+.mask{position:absolute;inset:0;background:rgba(12,14,15,.5)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-radius:26px 26px 0 0;padding:12px 18px 30px;animation:up .3s cubic-bezier(.2,.9,.3,1.08)}
+@keyframes up{from{transform:translateY(90px)}to{transform:none}}
+.grab{width:36px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 14px}
+.sheet h3{font-size:16px;margin-bottom:14px;text-align:center;font-weight:700}
+.big-num{text-align:center;font-size:54px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-1px;margin:6px 0 2px}
+.big-num small{font-size:15px;color:var(--sub);font-weight:600;letter-spacing:0}
+.stepper{display:flex;justify-content:center;gap:16px;margin:12px 0 18px}
+.stepper button{width:56px;height:56px;border-radius:18px;border:1px solid var(--line);background:var(--card);font-size:24px;font-weight:600;color:var(--ink);cursor:pointer}
+.btn-pri{width:100%;padding:15px;border:none;border-radius:16px;background:var(--ink);font-size:15px;font-weight:700;color:var(--bg);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+.food-fav{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.food-chip{padding:8px 13px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-size:13px;cursor:pointer;color:var(--ink)}
+.food-chip.on{background:var(--pri-soft);border-color:var(--pri);font-weight:600;color:var(--pri-deep)}
+[data-theme="dark"] .food-chip.on{color:var(--pri)}
+textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;padding:10px;font-size:14px;font-family:inherit;background:var(--card);resize:none;color:var(--ink)}
+.ph-add{display:flex;gap:8px;margin-top:10px}
+.ph-add .ph{border:1px dashed var(--line);color:var(--sub);font-size:12px;flex:none;width:72px}
+#toast{position:absolute;top:22px;left:50%;transform:translateX(-50%) translateY(-76px);background:var(--ink);color:var(--bg);padding:10px 17px;border-radius:13px;font-size:13px;transition:.3s;z-index:50;white-space:nowrap;display:flex;align-items:center;gap:7px}
+[data-theme="dark"] #toast{background:#ECEDEE;color:#151617}
+#toast.show{transform:translateX(-50%) translateY(0)}
+.detail-head{display:flex;gap:13px;align-items:center;margin-bottom:12px}
+.avatar.xl{width:62px;height:62px;font-size:26px}
+.b-name{font-weight:700;font-size:16px}
+.b-meta{color:var(--sub);font-size:12px;margin-top:2px;line-height:1.6}
+.tag{display:inline-block;padding:2.5px 9px;border-radius:8px;background:var(--surface);border:1px solid var(--line);font-size:11px;margin:3px 4px 0 0;color:var(--sub)}
+.dtabs{display:flex;background:var(--surface);border-radius:14px;padding:4px;margin-bottom:14px}
+.dtabs button{flex:1;border:none;background:none;padding:8.5px;border-radius:11px;font-size:13px;color:var(--sub);cursor:pointer;font-weight:600}
+.dtabs button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 4px rgba(18,19,20,.08)}
+.stat-row{display:flex;gap:9px;margin-bottom:14px}
+.stat{flex:1;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:11px;text-align:center}
+.stat b{font-size:17px;font-variant-numeric:tabular-nums;font-weight:700;letter-spacing:-.3px}
+.stat div{font-size:10.5px;color:var(--sub);margin-top:2px}
+.bar-row{display:flex;align-items:center;gap:9px;margin:8px 0;font-size:12px}
+.bar-row .nm{width:56px;flex:none;color:var(--sub)}
+.bar-row .bar{flex:1;height:8px;background:var(--surface);border-radius:4px;overflow:hidden}
+.bar-row .bar i{display:block;height:100%;background:var(--pri);border-radius:4px}
+.bar-row .pc{width:70px;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600}
+.food-row{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-bottom:9px}
+.food-row .fn{flex:1;font-size:13.5px}
+.badge{font-size:10px;padding:2px 7px;border-radius:6px;font-weight:600}
+.badge.safe{background:var(--pri-soft);color:var(--pri-deep)}
+.badge.caut{background:#FBF0DE;color:var(--amber)}
+.badge.danger{background:#FBE5E5;color:var(--danger)}
+[data-theme="dark"] .badge.caut{background:#332A1B;color:#E0A84E}
+[data-theme="dark"] .badge.danger{background:#331D1D;color:#E58A8A}
+.prefs{display:flex;gap:5px}
+.prefs button{width:33px;height:33px;border-radius:10px;border:1px solid var(--line);background:none;font-size:14px;cursor:pointer;color:var(--sub)}
+.prefs button.on{border-color:var(--pri);background:var(--pri-soft);color:var(--pri-deep)}
+[data-theme="dark"] .prefs button.on{color:var(--pri)}
+.search{width:100%;padding:11px 14px;border-radius:13px;border:1px solid var(--line);font-size:13.5px;background:var(--card);margin-bottom:10px;font-family:inherit;color:var(--ink)}
+.grid-ph{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.grid-ph .ph{aspect-ratio:1;border-radius:12px}
+.m-label{font-size:12px;color:var(--sub);margin:14px 2px 7px;font-weight:600;letter-spacing:.2px}
+.list-row{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px 14px;margin-bottom:9px;cursor:pointer}
+.list-row .ico{color:var(--sub)}
+.list-row .tt{flex:1;font-size:14px;font-weight:600;line-height:1.45}
+.list-row .ar{color:var(--sub)}
+.refnote{font-size:11px;color:var(--sub);margin-top:5px;line-height:1.5}
+.danger-tip{background:#FBEDED;border:1px solid #F5D5D5;border-radius:14px;padding:11px 13px;font-size:12px;color:#A03030;margin-bottom:12px;line-height:1.55}
+[data-theme="dark"] .danger-tip{background:#2A1C1C;border-color:#3A2424;color:#E09A9A}
+.seg{display:flex;background:var(--surface);border-radius:14px;padding:4px;margin-bottom:14px}
+.seg button{flex:1;border:none;background:none;padding:8.5px;border-radius:11px;font-size:13px;color:var(--sub);cursor:pointer;font-weight:600}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 4px rgba(18,19,20,.08)}
+.map{height:225px;border-radius:20px;position:relative;overflow:hidden;margin-bottom:10px;border:1px solid var(--line);
+  background:linear-gradient(90deg,transparent 47%,var(--line) 47%,var(--line) 53%,transparent 53%),linear-gradient(0deg,transparent 60%,var(--line) 60%,var(--line) 68%,transparent 68%),linear-gradient(35deg,var(--pri-soft) 0%,var(--pri-soft) 32%,transparent 32%),var(--bg)}
+.map .path{position:absolute;left:12%;top:18%;width:70%;height:55%;border-top:2.5px dashed var(--pri);border-radius:50%;transform:rotate(-12deg);opacity:.75}
+.pin{position:absolute;display:flex;flex-direction:column;align-items:center;cursor:pointer;transform:translate(-50%,-100%)}
+.pin .dot{width:28px;height:28px;border-radius:50% 50% 50% 4px;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;transform:rotate(45deg);box-shadow:0 4px 10px rgba(0,0,0,.22)}
+.pin .dot .ic{width:13px;height:13px;transform:rotate(-45deg);stroke-width:2}
+.pin .lb{font-size:10.5px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:2px 8px;margin-top:5px;font-weight:600}
+.hidden{display:none!important}
+/* 行迹地图 · 特色功能 */
+.map-chip{position:absolute;top:10px;left:10px;background:color-mix(in srgb,var(--card) 82%,transparent);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:11px;font-weight:600;display:flex;gap:5px;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.tstop{position:absolute;width:20px;height:20px;border-radius:50%;background:var(--ink);color:var(--bg);font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);box-shadow:0 2px 6px rgba(0,0,0,.25);z-index:2}
+.pin .thumb{width:34px;height:34px;border-radius:50% 50% 50% 4px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:15px;transform:rotate(45deg);box-shadow:0 4px 10px rgba(0,0,0,.22);border:2px solid #fff}
+.pin .thumb span{transform:rotate(-45deg)}
+.pin .lb{font-size:10.5px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:2px 8px;margin-top:5px;font-weight:600}
+.pcar{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 8px;scrollbar-width:none}
+.pcar::-webkit-scrollbar{display:none}
+.pcard{flex:none;width:152px;border-radius:16px;overflow:hidden;border:1px solid var(--line);background:var(--card);cursor:pointer}
+.pcard .cov{height:78px;display:flex;align-items:center;justify-content:center;font-size:28px;position:relative}
+.pcard .cov .n{position:absolute;top:7px;right:8px;background:rgba(0,0,0,.35);color:#fff;font-size:10px;padding:1.5px 7px;border-radius:7px;backdrop-filter:blur(4px)}
+.pcard .pb{padding:9px 11px}
+.pcard .pn{font-size:13px;font-weight:700}
+.pcard .pm{font-size:10.5px;color:var(--sub);margin-top:2px}
+.place-hero{border-radius:24px;overflow:hidden;position:relative;height:172px;margin-bottom:14px;background:linear-gradient(150deg,#CBE5D6,#5FA97E)}
+.place-hero .overlay{position:absolute;inset:auto 0 0 0;padding:14px 16px;background:linear-gradient(transparent,rgba(0,0,0,.4));color:#fff}
+.place-hero .pn{font-size:21px;font-weight:800}
+.place-hero .pm{font-size:12px;opacity:.9;margin-top:2px}
+/* ══ 回忆 · 影院画布（StoryTeller / Metro 致敬） ══ */
+.cinema{--bg:#0D1013;--surface:#171B1F;--card:#14181C;--ink:#EDEEEF;--sub:#8B9096;--line:#22272C;--pri:#7FD3A2;--pri-soft:#1B2E25;background:#0D1013}
+.mx-cap{font-size:10.5px;letter-spacing:2.5px;color:var(--pri);font-weight:700;margin-bottom:5px}
+.cinema h1{font-size:27px;letter-spacing:-.4px;margin-bottom:2px}
+.mx-stats{color:var(--sub);font-size:12px;margin:4px 0 16px}
+.cinema .seg{background:#161A1E;border:1px solid var(--line)}
+.cinema .seg button.on{background:#242B31;color:var(--ink);box-shadow:none}
+.cinema .tl-body{background:#14181C;border-color:#22272D}
+.cinema .photos .ph{border-radius:8px}
+.cinema .grid-ph{gap:3px}
+.cinema .grid-ph .ph{border-radius:3px}
+.pivot{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding-bottom:8px}
+.pivot::-webkit-scrollbar{display:none}
+.pvc{flex:none;width:76%;height:226px;border-radius:20px;position:relative;overflow:hidden}
+.pvc .bgi{position:absolute;inset:0}
+.pvc .ol{position:absolute;inset:auto 0 0 0;padding:13px 15px;background:linear-gradient(transparent,rgba(0,0,0,.58));color:#fff}
+.pvc .dt{font-size:10.5px;opacity:.85;letter-spacing:.8px}
+.pvc .tt{font-size:18px;font-weight:800;margin-top:3px;letter-spacing:-.2px}
+.pvc .mt{font-size:11px;opacity:.85;margin-top:3px}
+.mrow{display:flex;gap:12px;align-items:center;padding:11px 2px;border-bottom:1px solid #1B2025}
+.mrow:last-child{border-bottom:none}
+.mrow .mth{width:52px;height:52px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;font-size:20px}
+.mrow .tt2{flex:1;font-size:13.5px;font-weight:600}
+.mrow .tm{font-size:11px;color:var(--sub);margin-top:2px}
+.mx-map{height:252px;border-radius:20px;position:relative;overflow:hidden;border:1px solid #23282D;background:#12171B}
+.mx-map .road{position:absolute;background:#1D2429}
+.mx-map svg.route{position:absolute;inset:0;width:100%;height:100%}
+.mx-pin{position:absolute;display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);transition:opacity .4s}
+.mx-pin .p{width:26px;height:26px;border-radius:50%;background:#ECEDEE;color:#101315;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;box-shadow:0 0 0 4px rgba(237,238,239,.14)}
+.mx-pin .lb{font-size:10px;color:var(--sub);margin-top:4px;white-space:nowrap}
+.scrub{margin-top:14px}
+.scrub input{width:100%;accent-color:var(--pri)}
+.scrub .ends{display:flex;justify-content:space-between;font-size:10.5px;color:var(--sub);margin-top:5px}
+.cinema .m-label{color:var(--sub)}
+.cinema .list-row{background:#14181C;border-color:#22272D}
+.mx-note{font-size:11px;color:var(--sub);margin-top:14px;line-height:1.6}
+/* ══ 回忆 · StoryTeller 真实界面结构（巨型文字 Tab / 纸图气泡 / 大字地点列表） ══ */
+.mt{cursor:pointer;margin-right:13px;color:#C7C9CC;transition:color .15s}
+.mt.on{color:var(--ink)}
+.monthrail{display:flex;flex-direction:column;gap:8px;font-size:9.5px;color:var(--sub);text-align:center;padding-top:4px}
+.monthrail .on{color:var(--pri);font-weight:800}
+.mas{columns:2;column-gap:8px}
+.stile{position:relative;border-radius:16px;overflow:hidden;margin-bottom:8px;break-inside:avoid;aspect-ratio:.92;display:flex;align-items:center;justify-content:center;font-size:36px;cursor:pointer}
+.stile .ov{position:absolute;inset:auto 0 0 0;padding:24px 12px 10px;background:linear-gradient(transparent,rgba(0,0,0,.55));color:#fff}
+.stile .ov b{font-size:14.5px;letter-spacing:-.2px}
+.stile .ov small{display:block;font-size:10.5px;opacity:.85;margin-top:1px}
+.papermap{height:252px;border-radius:20px;position:relative;overflow:hidden;border:1px solid var(--line);
+  background:linear-gradient(0deg,#C9DCE8 0%,#C9DCE8 12%,transparent 12%),radial-gradient(90px 70px at 82% 78%,#DCE8D2,transparent 70%),linear-gradient(115deg,transparent 55%,#E4E0D5 55%,#E4E0D5 70%,transparent 70%),#EFEBE2}
+.papermap .park{position:absolute;left:6%;top:12%;width:34%;height:26%;border-radius:40% 60% 55% 45%;background:#D8E6CB}
+.papermap .water{position:absolute;right:-6%;bottom:-4%;width:46%;height:34%;border-radius:48% 52% 40% 60%/60% 40% 60% 40%;background:#C9DCE8}
+.papermap .rd{position:absolute;background:#FFFFFF}
+.papermap .zoomnote{position:absolute;right:8px;bottom:8px;font-size:10px;color:var(--sub);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:3px 8px}
+.cbub{position:absolute;transform:translate(-50%,-50%);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;box-shadow:0 3px 10px rgba(20,30,25,.22);cursor:pointer;transition:.15s}
+.cbub:hover{transform:translate(-50%,-50%) scale(1.06)}
+.cbub.g{background:#2F8F5B}.cbub.b{background:#4A7FB5}
+.pllist{margin-top:6px}
+.pllist .pl{display:block;font-size:22px;font-weight:800;letter-spacing:-.3px;margin:13px 2px;cursor:pointer;line-height:1.15}
+.pllist .pl:hover{opacity:.75}
+.pllist .pl small{display:block;font-size:11px;font-weight:500;color:var(--sub);letter-spacing:.3px;margin-top:2px}
+.pllist .c1{color:#2F8F5B}.pllist .c2{color:#4A7FB5}.pllist .c3{color:#B07A16}
+.remind-card{display:flex;gap:12px;align-items:center}
+.remind-card .ico{width:38px;height:38px;border-radius:12px;background:var(--surface);display:flex;align-items:center;justify-content:center}
+.remind-card .bd{flex:1}
+.remind-card .b-meta{font-size:11.5px}
+.btn-mini{border:1px solid var(--ink);background:var(--ink);color:var(--bg);border-radius:12px;padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer}
+.sec-t{font-weight:700;font-size:14.5px;margin:18px 2px 10px;display:flex;justify-content:space-between;align-items:center;letter-spacing:-.1px}
+.sec-t .more{color:var(--sub);font-size:12px;font-weight:500}
+.amount{font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+</style>
+</head>
+<body>
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></symbol>
+<symbol id="i-photo" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.5-4.5L7 20"/></symbol>
+<symbol id="i-feather" viewBox="0 0 24 24"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><path d="M16 8 2 22"/><path d="M17.5 15H9"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><circle cx="4" cy="12" r="1.8"/><circle cx="12" cy="10" r="1.8"/><circle cx="20" cy="14" r="1.8"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+<symbol id="i-leaf" viewBox="0 0 24 24"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8 0 5.5-4.8 10-10 10Z"/><path d="M2 21c0-3 1.9-5.4 5.1-6C9.5 14.5 12 13 13 12"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+<symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+<symbol id="i-wallet" viewBox="0 0 24 24"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.7 9a.6.6 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+<symbol id="i-pill" viewBox="0 0 24 24"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+</svg>
+
+<div id="phone" data-theme="light">
+
+<!-- ════════ ① 今天 ════════ -->
+<section class="screen active" id="s-today">
+  <div class="h-row"><h1>今天</h1>
+    <button class="iconbtn" onclick="toggleTheme()"><svg class="ic" id="themeIco"><use href="#i-moon"/></svg></button></div>
+
+  <div class="hero">
+    <div class="ring r1"></div><div class="ring r2"></div>
+    <div class="mono">黄</div>
+    <div class="chiprow">
+      <span class="a on" onclick="switchBird(this,'小黄','玄凤鹦鹉','8 个月 12 天 · 公','82.5','241 天','128 条','黄')">黄</span>
+      <span class="a" onclick="switchBird(this,'绿豆','虎皮鹦鹉','1 岁 3 个月 · 母','41.2','198 天','76 条','绿')">绿</span>
+      <span class="a" onclick="toast('新建档案：名字+品种即可')">＋</span>
+    </div>
+    <div class="overlay">
+      <div class="nm" id="hero-name">小黄</div>
+      <div class="mt" id="hero-meta">玄凤鹦鹉 · 8 个月 12 天 · 公</div>
+      <div class="stats">
+        <div class="st"><b id="hero-w">82.5 g</b><div>最新体重</div></div>
+        <div class="st"><b id="hero-days">241 天</b><div>陪伴时间</div></div>
+        <div class="st"><b id="hero-cnt">128 条</b><div>记一笔数量</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="padding:14px">
+    <div class="cal-head">
+      <b id="cal-title">本周 · 7 笔</b>
+      <span class="r"><button onclick="toast('上一周')">‹</button><button onclick="toast('回到本周')">今天</button><button onclick="toast('下一周')">›</button><button onclick="calModeNext()" id="modeBtn">月</button></span>
+    </div>
+    <div id="cal-week">
+      <div class="week">
+        <div class="wcell h1" onclick="pick('9 月 28 日 · 1 笔',1)"><div class="d">28</div><div class="c">1</div></div>
+        <div class="wcell" onclick="pick('9 月 29 日 · 0 笔',0)"><div class="d">29</div><div class="c">0</div></div>
+        <div class="wcell h2" onclick="pick('9 月 30 日 · 3 笔',3)"><div class="d">30</div><div class="c">3</div></div>
+        <div class="wcell h3" onclick="pick('10 月 1 日 · 5 笔',5)"><div class="d">1</div><div class="c">5</div></div>
+        <div class="wcell today" onclick="pick('10 月 2 日 · 2 笔',2)"><div class="d">2</div><div class="c">2</div></div>
+        <div class="wcell" onclick="pick('10 月 3 日 · 0 笔',0)"><div class="d">3</div><div class="c">0</div></div>
+        <div class="wcell" onclick="pick('10 月 4 日 · 0 笔',0)"><div class="d">4</div><div class="c">0</div></div>
+      </div>
+    </div>
+    <div id="cal-month" class="hidden">
+      <div class="mgrid">
+        <span class="wd">一</span><span class="wd">二</span><span class="wd">三</span><span class="wd">四</span><span class="wd">五</span><span class="wd">六</span><span class="wd">日</span>
+        <span class="mday dim">29</span><span class="mday dim h1">30</span>
+        <span class="mday h2" onclick="pick('10 月 1 日 · 5 笔',5)">1</span>
+        <span class="mday h1 today" onclick="pick('10 月 2 日 · 2 笔',2)">2</span>
+        <span class="mday">3</span><span class="mday">4</span>
+        <span class="mday h1" onclick="pick('10 月 5 日 · 1 笔',1)">5</span>
+        <span class="mday h2" onclick="pick('10 月 6 日 · 2 笔',2)">6</span>
+        <span class="mday h1" onclick="pick('10 月 7 日 · 1 笔',1)">7</span>
+        <span class="mday h1" onclick="pick('10 月 8 日 · 1 笔',1)">8</span>
+        <span class="mday h2" onclick="pick('10 月 9 日 · 2 笔',2)">9</span>
+        <span class="mday">10</span><span class="mday">11</span>
+        <span class="mday h1" onclick="pick('10 月 12 日 · 1 笔',1)">12</span>
+        <span class="mday h2" onclick="pick('10 月 13 日 · 2 笔',2)">13</span>
+        <span class="mday h1" onclick="pick('10 月 14 日 · 1 笔',1)">14</span>
+        <span class="mday h1" onclick="pick('10 月 15 日 · 1 笔',1)">15</span>
+        <span class="mday">16</span><span class="mday">17</span><span class="mday">18</span><span class="mday">19</span>
+        <span class="mday h1" onclick="pick('10 月 20 日 · 1 笔',1)">20</span>
+        <span class="mday h2" onclick="pick('10 月 21 日 · 2 笔',2)">21</span>
+        <span class="mday h1" onclick="pick('10 月 22 日 · 1 笔',1)">22</span>
+        <span class="mday h1" onclick="pick('10 月 23 日 · 1 笔',1)">23</span>
+        <span class="mday">24</span><span class="mday">25</span><span class="mday">26</span><span class="mday">27</span><span class="mday">28</span><span class="mday">29</span><span class="mday">30</span><span class="mday">31</span>
+      </div>
+    </div>
+    <div id="cal-year" class="hidden ygrid"><div id="yeargrid"></div></div>
+    <div class="legend">本月 16 天 · 42 笔
+      <span style="margin-left:auto;display:flex;gap:4px;align-items:center">少 <i class="l0"></i><i class="l1"></i><i class="l2"></i><i class="l3"></i> 多</span>
+    </div>
+  </div>
+
+  <div id="day-list">
+    <div class="sec-t">10 月 2 日 · 今天 <span class="more">2 条记录</span></div>
+    <div class="tl-item"><div class="tl-ico"><svg class="ic"><use href="#i-activity"/></svg></div><div class="tl-body"><b style="font-size:13.5px">小黄 称重 82.5 g</b><div class="tl-time">08:40</div></div></div>
+    <div class="tl-item"><div class="tl-ico"><svg class="ic"><use href="#i-leaf"/></svg></div><div class="tl-body"><b style="font-size:13.5px">小黄 吃了 燕麦米 <span class="badge safe">最爱</span></b><div class="tl-time">07:30</div></div></div>
+  </div>
+
+  <div class="sec-t">周期照护</div>
+  <div class="card remind-card" style="margin-bottom:0">
+    <div class="ico"><svg class="ic"><use href="#i-pill"/></svg></div>
+    <div class="bd"><b style="font-size:14px">体内驱虫</b><div class="b-meta">每 90 天 · 还剩 2 天</div></div>
+    <button class="btn-mini" onclick="done('已记录驱虫 ✓ 下次提醒：1 月 2 日')">记一次</button>
+  </div>
+</section>
+
+<!-- ════════ ② 回忆 ════════ -->
+<section class="screen" id="s-mem">
+  <div class="h-row">
+    <h1 style="font-size:27px;letter-spacing:-.5px;font-weight:800">
+      <span class="mt on" onclick="mseg(this,'m-story')">故事</span>
+      <span class="mt" onclick="mseg(this,'m-map')">地图</span>
+      <span class="mt" onclick="mseg(this,'m-photo')">照片</span>
+    </h1>
+    <span class="sub" style="align-self:flex-end">5 地点 · 103 张</span>
+  </div>
+
+  <div id="m-story">
+    <div style="display:flex;gap:10px">
+      <div class="monthrail"><span>6月</span><span>7月</span><span class="on">8月</span><span>9月</span><span>10月</span><span>11月</span></div>
+      <div class="mas" style="flex:1">
+        <div class="stile" style="background:linear-gradient(140deg,#CBE5D6,#5FA97E)" onclick="nav('s-place')"><div class="ov"><b>人民公园的夏天</b><small>12 张照片 · 2 条日记</small></div></div>
+        <div class="stile" style="background:linear-gradient(140deg,#D4E5F7,#8FB3D9);aspect-ratio:1.2"><div class="ov"><b>第一次洗澡</b><small>3 张照片</small></div></div>
+        <div class="stile" style="background:linear-gradient(140deg,#FFE9BE,#F0C25F)"><div class="ov"><b>家里的日常</b><small>86 张照片 · 持续更新</small></div></div>
+        <div class="stile" style="background:linear-gradient(140deg,#E3D7F5,#B9A5E0)"><div class="ov"><b>学会吹口哨</b><small>1 条日记</small></div></div>
+      </div>
+    </div>
+    <div class="refnote" style="margin-top:8px">故事 = 同一天同一地的照片与日记自动打包 · 左侧竖排月份为时间轨道</div>
+  </div>
+
+  <div id="m-map" class="hidden">
+    <div class="papermap">
+      <div class="park"></div><div class="water"></div>
+      <svg style="position:absolute;inset:0;width:100%;height:100%" viewBox="0 0 380 250" preserveAspectRatio="none">
+        <polyline points="90,200 220,120 310,60" fill="none" stroke="#2F8F5B" stroke-width="2.5" stroke-dasharray="7 7" opacity=".85"/>
+      </svg>
+      <span class="cbub g" style="left:58%;top:44%;width:56px;height:56px;font-size:17px">34</span>
+      <span class="cbub b" style="left:24%;top:74%;width:44px;height:44px;font-size:14px">86</span>
+      <span class="cbub g" style="left:80%;top:20%;width:34px;height:34px;font-size:12px">5</span>
+      <span class="cbub b" style="left:44%;top:20%;width:30px;height:30px;font-size:11px">6</span>
+      <span class="zoomnote">缩小地图 · 气泡自动合并成区域</span>
+    </div>
+    <div class="scrub">
+      <input type="range" min="0" max="30" value="30" oninput="tslide(this.value)">
+      <div class="ends"><span>4 月 · 启程</span><span>10 月 · 今天</span></div>
+    </div>
+    <div class="pllist">
+      <span class="pl c1" onclick="nav('s-place')">人民公园<small>城东区 · 12 次到访 · 34 张照片</small></span>
+      <span class="pl c2">外婆家<small>城西 · 1 次到访 · 5 张照片</small></span>
+      <span class="pl c3">阳台花市<small>2 次到访 · 6 张照片</small></span>
+      <span class="pl c1">安安异宠医院<small>2025 年 · 2 张照片</small></span>
+      <span class="pl c2">家 · 大本营<small>每一天 · 86 张照片</small></span>
+    </div>
+    <div class="refnote">📍 位置来自照片 EXIF，仅存本地 · 气泡颜色在绿/蓝间交替区分相邻地点</div>
+  </div>
+
+  <div id="m-photo" class="hidden">
+    <div class="m-label" style="margin-top:0">10 月 · 3 张</div>
+    <div class="grid-ph"><div class="ph g1">🦜</div><div class="ph g2">🌻</div><div class="ph" style="background:linear-gradient(140deg,#D9EBC4,#A8CE8E)">🌿</div></div>
+    <div class="m-label">9 月 · 4 张</div>
+    <div class="grid-ph"><div class="ph g4">🛁</div><div class="ph g3">☁️</div><div class="ph" style="background:linear-gradient(140deg,#F6D6E0,#EFB3C8)">🎶</div><div class="ph" style="background:linear-gradient(140deg,#E3D7F5,#C7B4EA)">🪶</div></div>
+  </div>
+</section>
+
+<!-- ════════ 地点详情（行迹特色页） ════════ -->
+<section class="screen" id="s-place">
+  <div class="h-row"><button class="iconbtn" onclick="nav('s-mem')"><svg class="ic"><use href="#i-back"/></svg></button><h1 style="font-size:16px">地点</h1><span class="chip" onclick="toast('编辑地点名/合并重复地点')">编辑</span></div>
+  <div class="place-hero">
+    <div class="overlay">
+      <div class="pn">人民公园</div>
+      <div class="pm">和 小黄、绿豆 一起 · 城东区 · 距家 3.2 km</div>
+    </div>
+  </div>
+  <div class="stat-row">
+    <div class="stat"><b>12 次</b><div>到访次数</div></div>
+    <div class="stat"><b>34 张</b><div>照片</div></div>
+    <div class="stat"><b>8 条</b><div>日记</div></div>
+    <div class="stat"><b>4 月</b><div>首次到访</div></div>
+  </div>
+  <div class="card" style="padding:13px">
+    <div class="h-row" style="margin:0 0 4px"><b style="font-size:14px">这里的故事</b></div>
+    <div class="b-meta" style="font-size:13px;line-height:1.7;color:var(--ink)">第一次带小黄出门就是这里。它先是被狗吓飞了，半小时后在草坪上彻底放开，学会了对着喷泉唱歌 🎵</div>
+    <div class="refnote">· 每个地点都可以写一段"我们的故事"</div>
+  </div>
+  <div class="sec-t">这里的照片 <span class="more">34 张 ›</span></div>
+  <div class="grid-ph"><div class="ph g2">🌳</div><div class="ph g1">🦜</div><div class="ph g3">☁️</div><div class="ph g4">🌿</div><div class="ph g2">🌾</div><div class="ph g1">🎵</div></div>
+  <div class="sec-t">在这里的日记</div>
+  <div class="tl-item"><div class="tl-ico"><svg class="ic"><use href="#i-pen"/></svg></div><div class="tl-body"><b style="font-size:13.5px">小黄 · 第一次放风，有点紧张但很勇敢</b><div class="tl-time">10 月 1 日 · 人民公园</div></div></div>
+  <div class="tl-item"><div class="tl-ico"><svg class="ic"><use href="#i-pen"/></svg></div><div class="tl-body"><b style="font-size:13.5px">绿豆 · 在草坪上打了个滚</b><div class="tl-time">9 月 21 日 · 人民公园</div></div></div>
+  <div class="refnote" style="margin-top:8px">⭐ 年度行迹回顾：「2026 年，你们一起去了 5 个地方」——可生成分享卡片</div>
+</section>
+
+<!-- ════════ 全部地点与故事（检索页，地点多时在这里找） ════════ -->
+<section class="screen" id="s-places">
+  <div class="h-row"><button class="iconbtn" onclick="nav('s-mem')"><svg class="ic"><use href="#i-back"/></svg></button><h1 style="font-size:16px">全部地点与故事</h1><span class="chip" onclick="toast('排序：最近 / 到访次数 / 照片数')">排序</span></div>
+  <div class="search">🔍 搜索地点名…</div>
+  <div class="m-label" style="margin-top:0">🏠 大本营</div>
+  <div class="list-row" onclick="toast('家的详情同理')"><span class="av y" style="width:42px;height:42px;font-size:16px">家</span><span class="tt">家<br><span class="b-meta">每一天 · 86 张照片</span></span><span class="ar sub">86 张 ›</span></div>
+  <div class="m-label">常去（≥5 次）</div>
+  <div class="list-row" onclick="nav('s-place')"><span class="av" style="width:42px;height:42px;font-size:16px">公</span><span class="tt">人民公园<br><span class="b-meta">12 次到访 · 最近 10 月 1 日</span></span><span class="ar sub">34 张 ›</span></div>
+  <div class="m-label">今年去过</div>
+  <div class="list-row" onclick="toast('地点详情同理')"><span class="av" style="width:42px;height:42px;font-size:16px">外</span><span class="tt">外婆家<br><span class="b-meta">1 次到访 · 最近 10 月 1 日</span></span><span class="ar sub">5 张 ›</span></div>
+  <div class="list-row" onclick="toast('地点详情同理')"><span class="av" style="width:42px;height:42px;font-size:16px">花</span><span class="tt">阳台花市<br><span class="b-meta">2 次到访 · 最近 8 月 17 日</span></span><span class="ar sub">6 张 ›</span></div>
+  <div class="m-label">更早</div>
+  <div class="list-row" onclick="toast('地点详情同理')"><span class="av" style="width:42px;height:42px;font-size:16px">医</span><span class="tt">安安异宠医院<br><span class="b-meta">1 次到访 · 2025 年</span></span><span class="ar sub">2 张 ›</span></div>
+  <div class="refnote">地点多了不慌：搜索直达 · 按到访频次自动分组 · 地图上缩小时还会聚合成"区域钉"</div>
+</section>
+
+<!-- ════════ ③ 鸟列表 ════════ -->
+<section class="screen" id="s-birds">
+  <div class="h-row"><h1>我的鸟</h1><span class="chip" onclick="toast('新建档案：名字+品种即可')">＋ 添加</span></div>
+  <div class="list-row" onclick="nav('s-bird')"><span class="av y" style="width:44px;height:44px;font-size:17px">黄</span><span class="tt">小黄<br><span class="b-meta">玄凤鹦鹉 · 公 · 脚环 L2024-017</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+  <div class="list-row" onclick="toast('绿豆详情同理')"><span class="av" style="width:44px;height:44px;font-size:17px">绿</span><span class="tt">绿豆<br><span class="b-meta">虎皮鹦鹉 · 母 · 来源：宠物店</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+  <div class="list-row" onclick="toast('新建档案流程：30 秒')" style="justify-content:center;color:var(--sub);font-size:13.5px;font-weight:600">＋ 添加一只新鸟</div>
+</section>
+
+<!-- ════════ ④ 我的 ════════ -->
+<section class="screen" id="s-me">
+  <div class="h-row"><h1>我的</h1></div>
+  <div class="list-row" onclick="cycleTheme()"><span class="ico"><svg class="ic" id="themeIco2"><use href="#i-moon"/></svg></span><span class="tt">外观</span><span class="ar sub" id="themeLabel">浅色 ›</span></div>
+  <div class="list-row" onclick="nav('s-cost')"><span class="ico"><svg class="ic"><use href="#i-wallet"/></svg></span><span class="tt">花费统计</span><span class="ar sub">本月 ¥238 ›</span></div>
+  <div class="list-row" onclick="nav('s-backup')"><span class="ico"><svg class="ic"><use href="#i-calendar"/></svg></span><span class="tt">备份与导出</span><span class="ar sub">›</span></div>
+  <div class="list-row" onclick="toast('预设周期：体内驱虫90天 · 体外30天 · 化毛14天 · 笼子7天')"><span class="ico"><svg class="ic"><use href="#i-bell"/></svg></span><span class="tt">提醒管理</span><span class="ar sub">›</span></div>
+  <div class="list-row" onclick="nav('s-food')"><span class="ico"><svg class="ic"><use href="#i-leaf"/></svg></span><span class="tt">食物库</span><span class="ar sub">›</span></div>
+  <div class="list-row" onclick="toast('数据仅存储在你的手机上 🧡')"><span class="ico"><svg class="ic"><use href="#i-shield"/></svg></span><span class="tt">关于鹦鹉日记</span><span class="ar sub">v0.1.0</span></div>
+</section>
+
+<!-- ════════ 鸟详情 ════════ -->
+<section class="screen" id="s-bird">
+  <div class="h-row"><button class="iconbtn" onclick="nav('s-birds')"><svg class="ic"><use href="#i-back"/></svg></button><h1 style="font-size:16px">鸟档案</h1><span class="chip" onclick="toast('编辑档案：全部字段可改')">编辑</span></div>
+  <div class="detail-head">
+    <div class="av y xl" style="font-size:24px">黄</div>
+    <div style="flex:1"><div class="b-name" style="font-size:19px">小黄</div>
+    <div class="b-meta">玄凤鹦鹉 · 公 · 8 个月 12 天 · 脚环 L2024-017</div>
+    <div><span class="tag">粘人</span><span class="tag">话痨</span><span class="tag">繁育者</span></div></div>
+  </div>
+  <div class="dtabs">
+    <button class="on" onclick="dtab(this,'d-ov')">概览</button>
+    <button onclick="dtab(this,'d-ph')">照片墙</button>
+    <button onclick="dtab(this,'d-diet')">饮食</button>
+  </div>
+  <div id="d-ov">
+    <div class="stat-row">
+      <div class="stat"><b>82.5g</b><div>最新体重</div></div>
+      <div class="stat"><b>80.1g</b><div>7 天前</div></div>
+      <div class="stat"><b>+2.4</b><div>周变化</div></div>
+    </div>
+    <div class="card">
+      <div class="h-row" style="margin:0 0 4px"><b style="font-size:14px">体重曲线</b><span class="sub">近 90 天</span></div>
+      <svg viewBox="0 0 320 130" style="width:100%">
+        <rect x="8" y="28" width="304" height="58" fill="#2F8F5B" opacity="0.08" rx="8"/>
+        <text x="14" y="42" font-size="9" fill="#2F8F5B">玄凤健康区间 78–105 g</text>
+        <polyline points="10,95 62,90 114,92 166,84 218,80 270,74 312,70" fill="none" stroke="#2F8F5B" stroke-width="2.5" stroke-linejoin="round"/>
+        <g fill="#2F8F5B"><circle cx="10" cy="95" r="3"/><circle cx="62" cy="90" r="3"/><circle cx="114" cy="92" r="3"/><circle cx="166" cy="84" r="3"/><circle cx="218" cy="80" r="3"/><circle cx="270" cy="74" r="3"/><circle cx="312" cy="70" r="4" stroke="#fff" stroke-width="1.5"/></g>
+      </svg>
+      <div class="refnote">🟢 色带为品种健康体重参考 · 体重连续下降会温和提醒</div>
+    </div>
+    <div class="card" onclick="nav('s-food')" style="cursor:pointer">
+      <div class="h-row" style="margin:0 0 8px"><b style="font-size:14px">饮食</b><span class="sub">管理偏好 ›</span></div>
+      <div style="font-size:13px;margin-bottom:8px">最爱：燕麦米 · 黄谷子 · 小米穗</div>
+      <div class="bar-row"><span class="nm">葵花子</span><span class="bar"><i style="width:42%"></i></span><span class="pc">42%</span></div>
+      <div class="bar-row"><span class="nm">燕麦米</span><span class="bar"><i style="width:31%"></i></span><span class="pc">31%</span></div>
+      <div class="bar-row"><span class="nm">黄谷子</span><span class="bar"><i style="width:18%"></i></span><span class="pc">18%</span></div>
+    </div>
+    <div class="card"><div class="h-row" style="margin:0 0 4px"><b style="font-size:14px">基本信息</b></div>
+      <div class="b-meta" style="font-size:13px;line-height:2">性别判定：行为观察 · 到家日：2024-02-14<br>来源：繁育者 · 性格：粘人 / 话痨<br>备注：会吹《小星星》前两句</div>
+    </div>
+  </div>
+  <div id="d-ph" class="hidden">
+    <div class="m-label" style="margin-top:0">10 月 · 2 张</div>
+    <div class="grid-ph"><div class="ph g1">🦜</div><div class="ph g2">🌻</div><div class="ph" style="border:1px dashed var(--line);color:var(--sub);font-size:11px" onclick="toast('写日记挂图,自动进照片墙')">＋ 去记录</div></div>
+    <div class="m-label">9 月 · 3 张</div>
+    <div class="grid-ph"><div class="ph g4">🛁</div><div class="ph g3">☁️</div><div class="ph" style="background:linear-gradient(140deg,#F6D6E0,#EFB3C8)">🎶</div></div>
+  </div>
+  <div id="d-diet" class="hidden">
+    <div class="danger-tip">🔴 危险食物默认隐藏：牛油果、巧克力、洋葱大蒜、咖啡浓茶、酒精、果核、含盐食物、生豆类</div>
+    <div class="search" onclick="toast('搜索:如 谷子 / 燕麦 / 滋养丸')">🔍 搜索食物…</div>
+    <div class="chips"><span class="chip on">全部</span><span class="chip">谷物种子</span><span class="chip">滋养丸</span><span class="chip">蔬果</span><span class="chip">零食补给</span></div>
+    <div class="food-row"><span class="fn"><b>燕麦米</b> <span class="badge safe">安全</span><br><span class="b-meta">❤️ 最爱 · 实际 31%</span></span>
+      <span class="prefs"><button class="on" onclick="mark(this)">❤️</button><button onclick="mark(this)">👍</button><button onclick="mark(this)">😐</button><button onclick="mark(this)">🚫</button></span></div>
+    <div class="food-row"><span class="fn"><b>黄谷子</b> <span class="badge safe">安全</span><br><span class="b-meta">❤️ 最爱 · 实际 18%</span></span>
+      <span class="prefs"><button class="on" onclick="mark(this)">❤️</button><button onclick="mark(this)">👍</button><button onclick="mark(this)">😐</button><button onclick="mark(this)">🚫</button></span></div>
+    <div class="food-row"><span class="fn"><b>葵花子</b> <span class="badge caut">适量</span><br><span class="b-meta">高脂建议适量 · 实际最多 42%</span></span>
+      <span class="prefs"><button onclick="mark(this)">❤️</button><button class="on" onclick="mark(this)">👍</button><button onclick="mark(this)">😐</button><button onclick="mark(this)">🚫</button></span></div>
+    <div class="food-row"><span class="fn"><b>滋养丸(通用)</b> <span class="badge safe">安全</span><br><span class="b-meta">尚未标记</span></span>
+      <span class="prefs"><button onclick="mark(this)">❤️</button><button onclick="mark(this)">👍</button><button onclick="mark(this)">😐</button><button onclick="mark(this)">🚫</button></span></div>
+    <div class="list-row" onclick="toast('自定义食物：名字+分类即可')" style="justify-content:center;color:var(--sub);font-size:13.5px;font-weight:600">＋ 添加自定义食物</div>
+  </div>
+</section>
+
+<!-- ════════ 食物库 ════════ -->
+<section class="screen" id="s-food">
+  <div class="h-row"><button class="iconbtn" onclick="nav('s-me')"><svg class="ic"><use href="#i-back"/></svg></button><h1 style="font-size:16px">食物库</h1><span class="chip" onclick="toast('自定义食物：名字+分类即可')">＋ 自定义</span></div>
+  <div class="search">🔍 搜索食物（含危险食物警示）…</div>
+  <div class="chips"><span class="chip on">全部 36</span><span class="chip">谷物种子</span><span class="chip">滋养丸</span><span class="chip">蔬果</span><span class="chip">零食补给</span><span class="chip">自定义</span></div>
+  <div class="food-row"><span class="fn"><b>黄谷子</b> <span class="badge safe">安全</span><br><span class="b-meta">主食 · 小黄 ❤️</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+  <div class="food-row"><span class="fn"><b>燕麦米</b> <span class="badge safe">安全</span><br><span class="b-meta">主食 · 小黄 ❤️</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+  <div class="food-row"><span class="fn"><b>葵花子</b> <span class="badge caut">适量</span><br><span class="b-meta">高脂，建议适量</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+  <div class="food-row" style="opacity:.85"><span class="fn"><b>牛油果</b> <span class="badge danger">禁吃</span><br><span class="b-meta">对鸟类剧毒——仅作警示教育</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+</section>
+
+<!-- ════════ 花费统计 ════════ -->
+<section class="screen" id="s-cost">
+  <div class="h-row"><button class="iconbtn" onclick="nav('s-me')"><svg class="ic"><use href="#i-back"/></svg></button><h1 style="font-size:16px">花费统计</h1><span class="chip" onclick="openSheet('cost')">＋ 记一笔</span></div>
+  <div class="seg"><button class="on" onclick="toast('周视图同理')">周</button><button onclick="toast('月视图')">月</button><button onclick="toast('年视图')">年</button></div>
+  <div class="stat-row">
+    <div class="stat"><b>¥238</b><div>本月合计</div></div>
+    <div class="stat"><b>¥59.5</b><div>月均 / 只</div></div>
+    <div class="stat"><b>¥2,856</b><div>今年累计</div></div>
+  </div>
+  <div class="card">
+    <div class="h-row" style="margin:0 0 8px"><b style="font-size:14px">分类构成 · 10 月</b></div>
+    <div class="bar-row"><span class="nm">粮食</span><span class="bar"><i style="width:45%"></i></span><span class="pc">¥107</span></div>
+    <div class="bar-row"><span class="nm">用品</span><span class="bar"><i style="width:24%"></i></span><span class="pc">¥58</span></div>
+    <div class="bar-row"><span class="nm">医疗</span><span class="bar"><i style="width:17%"></i></span><span class="pc">¥40</span></div>
+    <div class="bar-row"><span class="nm">玩具</span><span class="bar"><i style="width:9%"></i></span><span class="pc">¥21</span></div>
+    <div class="bar-row"><span class="nm">洗护</span><span class="bar"><i style="width:5%"></i></span><span class="pc">¥12</span></div>
+    <div class="refnote">预算管理（每月上限提醒）二期上线</div>
+  </div>
+  <div class="sec-t">最近开销</div>
+  <div class="list-row"><span class="ico"><svg class="ic"><use href="#i-leaf"/></svg></span><span class="tt">滋养丸一袋<br><span class="b-meta">昨天 · 粮食 · 关联：绿豆</span></span><span class="amount">¥98</span></div>
+  <div class="list-row"><span class="ico"><svg class="ic"><use href="#i-pill"/></svg></span><span class="tt">绿豆 体内驱虫药<br><span class="b-meta">10 月 1 日 · 医疗</span></span><span class="amount">¥40</span></div>
+</section>
+
+<!-- ════════ 备份 ════════ -->
+<section class="screen" id="s-backup">
+  <div class="h-row"><button class="iconbtn" onclick="nav('s-me')"><svg class="ic"><use href="#i-back"/></svg></button><h1 style="font-size:16px">备份与导出</h1></div>
+  <div class="card"><div class="h-row" style="margin:0 0 6px"><b style="font-size:14px">自动备份</b><span class="chip on" style="padding:3px 10px">每周日 ✓</span></div>
+  <div class="b-meta">上次备份：10 月 1 日 21:00 · 128 MB（含 36 张照片）<br>位置：/Download/鹦鹉日记备份/</div></div>
+  <div class="list-row" onclick="done('已生成 毛球的档案.petdiary ✓')"><span class="ico"><svg class="ic"><use href="#i-wallet"/></svg></span><span class="tt">立即备份</span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+  <div class="list-row" onclick="toast('恢复流程：选文件→校验→合并或覆盖→报告')"><span class="ico"><svg class="ic"><use href="#i-photo"/></svg></span><span class="tt">从备份恢复</span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+  <div class="list-row" onclick="done('CSV 已导出（含体重/喂食/开销）')"><span class="ico"><svg class="ic"><use href="#i-activity"/></svg></span><span class="tt">导出 CSV</span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+  <div class="list-row" onclick="done('就诊报告长图已生成')"><span class="ico"><svg class="ic"><use href="#i-camera"/></svg></span><span class="tt">生成就诊报告长图</span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+</section>
+
+<button id="fab" onclick="openSheet('home')"><svg class="ic"><use href="#i-plus"/></svg>记一笔</button>
+<nav id="tabbar">
+  <button class="on" onclick="nav('s-today',this)"><svg class="ic"><use href="#i-home"/></svg>今天</button>
+  <button onclick="nav('s-mem',this)"><svg class="ic"><use href="#i-photo"/></svg>回忆</button>
+  <button onclick="nav('s-birds',this)"><svg class="ic"><use href="#i-feather"/></svg>鸟</button>
+  <button onclick="nav('s-me',this)"><svg class="ic"><use href="#i-sliders"/></svg>我的</button>
+</nav>
+
+<div class="sheet-wrap" id="sw">
+  <div class="mask" onclick="closeSheet()"></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <div id="sh-home">
+      <h3>记一笔</h3>
+      <div class="chips" style="justify-content:center"><span class="chip on">黄 · 小黄</span><span class="chip">绿 · 绿豆</span></div>
+      <div class="list-row" onclick="openSheet('weight')"><span class="ico"><svg class="ic"><use href="#i-activity"/></svg></span><span class="tt">记体重 <span class="b-meta">默认上次 82.5 g</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+      <div class="list-row" onclick="openSheet('feed')"><span class="ico"><svg class="ic"><use href="#i-leaf"/></svg></span><span class="tt">记喂食</span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+      <div class="list-row" onclick="openSheet('camera')"><span class="ico"><svg class="ic"><use href="#i-camera"/></svg></span><span class="tt">拍照 · 视频 <span class="b-meta">自动带拍摄地点</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+      <div class="list-row" onclick="openSheet('diary')"><span class="ico"><svg class="ic"><use href="#i-pen"/></svg></span><span class="tt">写日记</span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+      <div class="list-row" onclick="openSheet('cost')"><span class="ico"><svg class="ic"><use href="#i-wallet"/></svg></span><span class="tt">记开销</span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+    </div>
+    <div id="sh-weight" class="hidden">
+      <h3>小黄 · 记体重</h3>
+      <div class="big-num"><span id="wnum">82.5</span><small> g</small></div>
+      <div class="stepper"><button onclick="step(-0.5)">−</button><button onclick="step(0.5)">＋</button></div>
+      <button class="btn-pri" onclick="saveWeight()"><svg class="ic" style="width:16px"><use href="#i-check"/></svg>保存</button>
+    </div>
+    <div id="sh-feed" class="hidden">
+      <h3>小黄 · 记喂食</h3>
+      <div class="refnote" style="margin:0 0 9px">最爱食物优先显示</div>
+      <div class="food-fav">
+        <span class="food-chip on">燕麦米</span><span class="food-chip">黄谷子</span><span class="food-chip">葵花子</span><span class="food-chip">滋养丸</span><span class="food-chip" onclick="nav('s-food')">全库 ›</span>
+      </div>
+      <textarea placeholder="备注（可选）"></textarea>
+      <button class="btn-pri" style="margin-top:14px" onclick="done('已记录喂食 ✓')">保存</button>
+    </div>
+    <div id="sh-camera" class="hidden">
+      <h3>拍照 · 视频</h3>
+      <div class="ph" style="height:170px;border-radius:18px;background:linear-gradient(140deg,var(--s2),var(--pri))"></div>
+      <div class="refnote" style="margin:10px 2px">将调起相机 · 照片自动记录拍摄地点 → 出现在「回忆 · 地图」与照片墙</div>
+      <textarea placeholder="一句话（可选）"></textarea>
+      <button class="btn-pri" style="margin-top:14px" onclick="done('已保存到回忆 ✓')">保存</button>
+    </div>
+    <div id="sh-diary" class="hidden">
+      <h3>写日记 · 小黄</h3>
+      <textarea placeholder="今天的小黄…"></textarea>
+      <div class="ph-add"><div class="ph">＋ 照片</div><div class="ph">＋ 视频</div></div>
+      <div class="chips" style="margin-top:10px"><span class="chip">换羽</span><span class="chip">洗澡</span><span class="chip">放风</span><span class="chip on">精神好</span></div>
+      <button class="btn-pri" style="margin-top:14px" onclick="done('日记已保存 ✓')">保存</button>
+    </div>
+    <div id="sh-cost" class="hidden">
+      <h3>记开销 · 小黄</h3>
+      <div class="big-num" style="font-size:44px"><small>¥ </small><input type="number" value="98" style="width:120px;font-size:44px;font-weight:800;text-align:center;border:none;background:none;color:var(--ink);outline:none;font-variant-numeric:tabular-nums;font-family:inherit"></div>
+      <div class="cats" style="display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-bottom:14px">
+        <span class="food-chip on">粮食</span><span class="food-chip">玩具</span><span class="food-chip">用品</span><span class="food-chip">医疗</span><span class="food-chip">洗护</span><span class="food-chip">其他</span>
+      </div>
+      <textarea placeholder="备注（可选）：如 滋养丸一袋"></textarea>
+      <button class="btn-pri" style="margin-top:14px" onclick="done('已记录开销 ¥98 ✓')">保存</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+</div>
+
+<script>
+let cur='s-today', w=82.5, mode=0;
+const modes=['week','month','year'], modeNames=['周条','月视图','年热力图'], modeBtnTxt=['月','年','周'];
+const themes=['浅色','深色'];let ti=0;
+function applyTheme(t){document.getElementById('phone').dataset.theme=t;
+  const u=t==='dark'?'#i-sun':'#i-moon';
+  document.getElementById('themeIco').firstElementChild.setAttribute('href',u);
+  document.getElementById('themeIco2').firstElementChild.setAttribute('href',u);
+  document.getElementById('themeLabel').textContent=t==='dark'?'深色 ›':'浅色 ›';}
+function toggleTheme(){ti=1-ti;applyTheme(themes[ti]);}
+function cycleTheme(){ti=1-ti;applyTheme(themes[ti]);toast('外观：'+themes[ti]+'（正式版含"跟随系统"）');}
+function nav(id,btn){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');cur=id;
+  document.querySelectorAll('#tabbar button').forEach(b=>b.classList.remove('on'));
+  const map={'s-today':0,'s-mem':1,'s-birds':2,'s-me':3};if(map[id]!==undefined)document.querySelectorAll('#tabbar button')[map[id]].classList.add('on');
+  document.getElementById('fab').style.display=['s-today','s-mem','s-birds'].includes(id)?'flex':'none';}
+function openSheet(name){document.getElementById('sw').classList.add('show');['home','weight','feed','camera','diary','cost'].forEach(k=>document.getElementById('sh-'+k).classList.toggle('hidden',k!==name));
+  document.getElementById('fab').style.display='none';}
+function closeSheet(){document.getElementById('sw').classList.remove('show');
+  document.getElementById('fab').style.display=['s-today','s-mem','s-birds'].includes(cur)?'flex':'none';}
+function step(d){w=Math.round((w+d)*10)/10;document.getElementById('wnum').textContent=w.toFixed(1);}
+function saveWeight(){document.getElementById('hero-w').textContent=w.toFixed(1)+' g';done('已记录 '+w.toFixed(1)+' g ✓');}
+function done(msg){closeSheet();toast(msg);}
+let lt;function toast(m){const t=document.getElementById('toast');t.innerHTML='<svg class="ic" style="width:15px;height:15px"><use href="#i-check"/></svg>'+m;t.classList.add('show');clearTimeout(lt);lt=setTimeout(()=>t.classList.remove('show'),1900);}
+function dtab(btn,id){btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
+  ['d-ov','d-ph','d-diet'].forEach(k=>document.getElementById(k).classList.toggle('hidden',k!==id));}
+function mseg(el,id){el.parentElement.querySelectorAll('.mt').forEach(s=>s.classList.remove('on'));el.classList.add('on');
+  ['m-story','m-photo','m-map'].forEach(k=>document.getElementById(k).classList.toggle('hidden',k!==id));}
+function mark(btn){btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');toast('已更新饮食偏好');}
+function switchBird(el,name,species,meta,wt,days,cnt,ch){document.querySelectorAll('.avstack .a').forEach(a=>a.classList.remove('on'));el.classList.add('on');
+  document.getElementById('hero-name').textContent=name;
+  document.getElementById('hero-meta').textContent=species+' · '+meta;
+  document.getElementById('hero-w').textContent=wt+' g';
+  document.getElementById('hero-days').textContent=days;
+  document.getElementById('hero-cnt').textContent=cnt;
+  document.querySelector('.hero .mono').textContent=ch;toast('已切换到：'+name);}
+function calModeNext(){mode=(mode+1)%3;
+  document.getElementById('cal-week').classList.toggle('hidden',mode!==0);
+  document.getElementById('cal-month').classList.toggle('hidden',mode!==1);
+  document.getElementById('cal-year').classList.toggle('hidden',mode!==2);
+  document.getElementById('cal-title').textContent=['本周 · 7 笔','2026 年 10 月','2026 年 · 热力图'][mode];
+  document.getElementById('modeBtn').textContent=modeBtnTxt[mode];}
+function pick(label,count){const list=document.getElementById('day-list');
+  document.getElementById('cal-title').textContent=label;
+  list.innerHTML=`<div class="sec-t">${label} <span class="more">${count} 条记录</span></div>`+
+   (count>0?[1,2].slice(0,Math.min(count,2)).map((n,i)=>`<div class="tl-item"><div class="tl-ico"><svg class="ic"><use href="#i-pen"/></svg></div><div class="tl-body"><b style="font-size:13.5px">记录 ${i+1}（原型示意）</b><div class="tl-time">点开看详情</div></div></div>`).join('')
+   :`<div class="card" style="text-align:center;color:var(--sub);font-size:13px">这天没有记录 <span style="color:var(--pri);font-weight:700;cursor:pointer" onclick="toast('补记：日期已选为当天')">＋ 补记</span></div>`);}
+function tslide(v){const n=Math.round(v/10);
+  document.querySelectorAll('#m-map .mx-pin').forEach(el=>{el.style.opacity=(+el.dataset.step<=n)?'1':'0.12'});
+  const r=document.getElementById('traj2');if(r)r.style.opacity=(n>0)?'0.95':'0.12';
+  document.getElementById('mapchip').textContent=`📍 行迹已亮起 ${n} / 3 站 · ${[12,38,71,103][n]} 张照片`;}
+(function(){const g=document.getElementById('yeargrid');const names=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+ for(let m=0;m<12;m++){const row=document.createElement('div');row.className='yr';
+  const lb=document.createElement('span');lb.className='yl';lb.textContent=names[m];row.appendChild(lb);
+  for(let d=1;d<=31;d++){const c=document.createElement('span');c.className='yc';
+   const v=(m*7+d*3)%7; if(v>=2&&v<4)c.classList.add('h1');else if(v<6&&v>=4)c.classList.add('h2');else if(v===6)c.classList.add('h3');
+   c.onclick=()=>toast(names[m]+d+' 日 · 点击查看当天记录');row.appendChild(c);}g.appendChild(row);}})();
+</script>
+</body>
+</html>

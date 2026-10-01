@@ -43,6 +43,12 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 vico-compose-m3 = { group = "com.patrykandpatrick.vico", name = "compose-m3", version.ref = "vico" }
 
+# ---- 测试 ----
+junit4 = { group = "junit", name = "junit", version = "4.13.2" }
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version = "1.2.1" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version = "1.6.2" }
+androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 # Kotlin 由 AGP 9 内置，不再单独应用 kotlin-android 插件（官方迁移指南 developer.android.com/build/migrate-to-built-in-kotlin）

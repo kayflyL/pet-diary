@@ -1,0 +1,26 @@
+# Android / IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Gradle
+.gradle/
+build/
+local.properties
+
+# Android
+captures/
+.externalNativeBuild/
+.cxx/
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+
+# 临时与备份
+*.bak
+*.tmp
+~$*

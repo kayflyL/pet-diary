@@ -168,6 +168,17 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
 .pin .dot{width:28px;height:28px;border-radius:50% 50% 50% 4px;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;transform:rotate(45deg);box-shadow:0 4px 10px rgba(0,0,0,.22)}
 .pin .dot .ic{width:13px;height:13px;transform:rotate(-45deg);stroke-width:2}
 .pin .lb{font-size:10.5px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:2px 8px;margin-top:5px;font-weight:600}
+/* 回忆 · StoryTeller 情感设计 */
+.mcap{font-size:10px;letter-spacing:2.5px;color:var(--pri);font-weight:700;margin-bottom:5px}
+.mquote{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--pri);border-radius:12px;padding:11px 13px;font-size:12px;color:var(--sub);line-height:1.65;margin-bottom:14px}
+.mquote b{color:var(--ink)}
+.papermap .dpin{position:absolute;width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 3px 8px rgba(0,0,0,.25);transform:translate(-50%,-50%)}
+.papermap .cluster{position:absolute;width:62px;height:62px;border-radius:50%;border:3px solid #fff;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.28);transform:translate(-50%,-50%)}
+.papermap .cluster .ci{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px}
+.papermap .bubble{position:absolute;background:var(--ink);color:#fff;border-radius:999px;font-size:10px;padding:2px 8px;transform:translate(-50%,-50%);white-space:nowrap}
+.papermap .dayb{position:absolute;background:var(--pri);color:#fff;font-size:9px;padding:2px 7px;border-radius:8px;transform:translate(-50%,-50%);font-weight:700}
+.scrubfab{width:52px;height:52px;border-radius:50%;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:19px;box-shadow:var(--shadow);cursor:pointer;margin:14px auto 0}
+.dupnote{font-size:11px;color:var(--sub);margin-top:6px}
 .hidden{display:none!important}
 /* 行迹地图 · 特色功能 */
 .map-chip{position:absolute;top:10px;left:10px;background:color-mix(in srgb,var(--card) 82%,transparent);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:11px;font-weight:600;display:flex;gap:5px;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,.06)}
@@ -369,6 +380,7 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
 
 <!-- ════════ ② 回忆 ════════ -->
 <section class="screen" id="s-mem">
+  <div class="mcap">MEMORIES · 情感元数据</div>
   <div class="h-row">
     <h1 style="font-size:27px;letter-spacing:-.5px;font-weight:800">
       <span class="mt on" onclick="mseg(this,'m-story')">故事</span>
@@ -377,18 +389,19 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
     </h1>
     <span class="sub" style="align-self:flex-end">5 地点 · 103 张</span>
   </div>
+  <div class="mquote"><b>“把照片重新变回事件”</b> —— 每一次称重、每一顿饭、每一张照片，都是你们共同经历的<b>情感元数据</b>。地图不只是定位，是讲故事时重踏的足迹。（设计理念源自 Nokia StoryTeller）</div>
 
   <div id="m-story">
     <div style="display:flex;gap:10px">
       <div class="monthrail"><span>6月</span><span>7月</span><span class="on">8月</span><span>9月</span><span>10月</span><span>11月</span></div>
       <div class="mas" style="flex:1">
-        <div class="stile" style="background:linear-gradient(140deg,#CBE5D6,#5FA97E)" onclick="nav('s-place')"><div class="ov"><b>人民公园的夏天</b><small>12 张照片 · 2 条日记</small></div></div>
-        <div class="stile" style="background:linear-gradient(140deg,#D4E5F7,#8FB3D9);aspect-ratio:1.2"><div class="ov"><b>第一次洗澡</b><small>3 张照片</small></div></div>
+        <div class="stile" style="background:linear-gradient(140deg,#CBE5D6,#5FA97E)" onclick="nav('s-place')"><div class="ov"><b>人民公园的夏天</b><small>4 月 5 日 · 12 张照片 · 2 条日记</small></div></div>
+        <div class="stile" style="background:linear-gradient(140deg,#D4E5F7,#8FB3D9);aspect-ratio:1.2"><div class="ov"><b>第一次洗澡</b><small>9 月 28 日 · 3 张照片</small></div></div>
         <div class="stile" style="background:linear-gradient(140deg,#FFE9BE,#F0C25F)"><div class="ov"><b>家里的日常</b><small>86 张照片 · 持续更新</small></div></div>
         <div class="stile" style="background:linear-gradient(140deg,#E3D7F5,#B9A5E0)"><div class="ov"><b>学会吹口哨</b><small>1 条日记</small></div></div>
       </div>
     </div>
-    <div class="refnote" style="margin-top:8px">故事 = 同一天同一地的照片与日记自动打包 · 左侧竖排月份为时间轨道</div>
+    <div class="refnote" style="margin-top:8px">故事 = 同一天同一地的照片与日记自动打包 · 左侧竖排月份为时间轨道 · 重复照片自动隐藏</div>
   </div>
 
   <div id="m-map" class="hidden">
@@ -396,17 +409,24 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
       <div class="park"></div><div class="water"></div>
       <svg style="position:absolute;inset:0;width:100%;height:100%" viewBox="0 0 380 250" preserveAspectRatio="none">
         <polyline points="90,200 220,120 310,60" fill="none" stroke="#2F8F5B" stroke-width="2.5" stroke-dasharray="7 7" opacity=".85"/>
+        <circle cx="220" cy="120" r="34" fill="#fff" stroke="#2F8F5B" stroke-width="2.5"/>
+        <text x="220" y="118" text-anchor="middle" font-size="11" fill="#2F8F5B" font-weight="700">人民公园</text>
+        <text x="220" y="132" text-anchor="middle" font-size="9" fill="#2F8F5B">12 次到访</text>
       </svg>
-      <span class="cbub g" style="left:58%;top:44%;width:56px;height:56px;font-size:17px">34</span>
-      <span class="cbub b" style="left:24%;top:74%;width:44px;height:44px;font-size:14px">86</span>
-      <span class="cbub g" style="left:80%;top:20%;width:34px;height:34px;font-size:12px">5</span>
-      <span class="cbub b" style="left:44%;top:20%;width:30px;height:30px;font-size:11px">6</span>
+      <span class="dpin" style="left:24%;top:74%">🏠</span>
+      <span class="dpin" style="left:80%;top:20%">🌳</span>
+      <span class="bubble" style="left:44%;top:18%">6 张</span>
+      <span class="dayb" style="left:16%;top:24%">第 1 天 · 家</span>
+      <span class="dayb" style="left:52%;top:52%">第 2 天 · 人民公园</span>
+      <span class="dayb" style="left:86%;top:70%">第 3 天 · 外婆家</span>
       <span class="zoomnote">缩小地图 · 气泡自动合并成区域</span>
     </div>
     <div class="scrub">
       <input type="range" min="0" max="30" value="30" oninput="tslide(this.value)">
       <div class="ends"><span>4 月 · 启程</span><span>10 月 · 今天</span></div>
     </div>
+    <div class="scrubfab" onclick="toast('时光回放：拖动上方滑轨，看行迹一点点长出来')">⏱</div>
+    <div class="mquote" style="margin-top:14px">“你在公园的一天，可以变成更深层的故事：告诉人们那张照片是在哪里拍的。” <b>—— 位置就是情感元数据</b></div>
     <div class="pllist">
       <span class="pl c1" onclick="nav('s-place')">人民公园<small>城东区 · 12 次到访 · 34 张照片</small></span>
       <span class="pl c2">外婆家<small>城西 · 1 次到访 · 5 张照片</small></span>
@@ -422,6 +442,7 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
     <div class="grid-ph"><div class="ph g1">🦜</div><div class="ph g2">🌻</div><div class="ph" style="background:linear-gradient(140deg,#D9EBC4,#A8CE8E)">🌿</div></div>
     <div class="m-label">9 月 · 4 张</div>
     <div class="grid-ph"><div class="ph g4">🛁</div><div class="ph g3">☁️</div><div class="ph" style="background:linear-gradient(140deg,#F6D6E0,#EFB3C8)">🎶</div><div class="ph" style="background:linear-gradient(140deg,#E3D7F5,#C7B4EA)">🪶</div></div>
+    <div class="dupnote">✨ 同一场景的连拍会自动隐藏重复，保留最好的那张（StoryTeller 概念）</div>
   </div>
 </section>
 

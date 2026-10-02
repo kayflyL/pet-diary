@@ -57,7 +57,11 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.compose.material.icons)
+    implementation(libs.androidx.exifinterface)
+    implementation(libs.osmdroid)
 
+    implementation(libs.androidx.exifinterface)
+    implementation(libs.osmdroid)
     testImplementation(libs.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)

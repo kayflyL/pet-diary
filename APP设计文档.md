@@ -70,6 +70,8 @@ FAB「记一笔」→ 抽屉**五选一**：记体重 / 记喂食 / 拍照·视�
 
 ## 7. 照片与行迹地图（★特色功能 · 已核对 StoryTeller 真实界面与官方设计博客）
 
+> **2026-10-03 定案（用户）**：「行迹」段改为**照片地图**——去掉轨迹线，照片直接以圆形缩略图钉落图；缩小时相近照片自动聚合成带计数的气泡（防乱），点聚合/单钉直接全屏看大图，左右滑切换同一地点的照片；缩放拆分交给双指手势。交互基准：Apple 照片 Places、荣耀地图相册、Google Photos 地图视图（2020-2023）。
+
 照片来源=日记挂图+拍照入口；照片墙按月分组。**行迹地图=本 App 的招牌功能**。设计 DNA 经三重核证：①[真实界面截图](https://allaboutwindowsphone.com/flow/item/20458_Lumia_Storyteller_improvements.php) ②[设计师 Annina Koskinen 案例页](https://anninakoskinen.com/project/nokia-storyteller)（15 张设计稿全览）③[官方设计博客 "it's emotional"](https://blogs.windows.com/devices/2013/12/10/nokia-storyteller-emotional/)。
 
 **设计哲学（官方原话）**："把照片重新变回事件（turn pictures back into events）"；**位置 = 情感元数据（Emotional metadata）**——"你在巴黎的一天可以变成更深层的故事：告诉人们餐厅在哪、背景的教堂叫什么。讲故事时，你是在重踏这座城市的足迹。"

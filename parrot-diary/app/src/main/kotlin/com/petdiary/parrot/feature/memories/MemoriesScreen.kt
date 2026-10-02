@@ -11,6 +11,7 @@ import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -32,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,24 +44,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import org.osmdroid.events.MapListener
+import org.osmdroid.events.ScrollEvent
+import org.osmdroid.events.ZoomEvent
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.Polyline
 
 /** 地点大字列表的轮换色（设计文档 §7：绿/蓝/琥珀交替） */
 private val placeColors = listOf(Color(0xFF2F8F5B), Color(0xFF4A7FB5), Color(0xFFB07A16))
@@ -66,6 +74,9 @@ private val placeColors = listOf(Color(0xFF2F8F5B), Color(0xFF4A7FB5), Color(0xF
 fun MemoriesScreen(vm: MemoriesViewModel = hiltViewModel()) {
     val ui by vm.ui.collectAsState()
     var seg by remember { mutableIntStateOf(0) }
+    val placeCount = ui.geotagged
+        .groupBy { it.placeName ?: "%.3f,%.3f".format(it.lat ?: 0.0, it.lng ?: 0.0) }
+        .size
 
     PaperTheme {
         Scaffold { padding ->
@@ -86,14 +97,14 @@ fun MemoriesScreen(vm: MemoriesViewModel = hiltViewModel()) {
                 )
                 Text("回忆", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(top = 4.dp))
                 Text(
-                    "${ui.stories.size} 个故事 · ${ui.photos.size} 张照片 · ${ui.geotagged.size} 个足迹",
+                    "${ui.stories.size} 个故事 · ${ui.photos.size} 张照片 · $placeCount 个地方",
                     fontSize = 12.sp,
                     color = SubInk,
                     modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(bottom = 14.dp)) {
-                    listOf("故事", "照片", "行迹").forEachIndexed { i, label ->
+                    listOf("故事", "照片", "地图").forEachIndexed { i, label ->
                         FilterChip(selected = seg == i, onClick = { seg = i }, label = { Text(label) })
                     }
                 }
@@ -101,7 +112,7 @@ fun MemoriesScreen(vm: MemoriesViewModel = hiltViewModel()) {
                 when (seg) {
                     0 -> StoryList(ui.stories)
                     1 -> PhotoWall(ui.photos)
-                    else -> TrailMap(ui.geotagged)
+                    else -> PhotoMap(ui.geotagged)
                 }
             }
         }
@@ -257,15 +268,18 @@ private fun amapTileSource() = object : OnlineTileSourceBase(
     }
 }
 
-/** 行迹地图上的足迹点 */
+/** 地图上的一张带位置照片 */
 private data class GeoPhoto(val lat: Double, val lng: Double, val photo: PhotoUi)
 
-/** 按地点聚合的行迹列表行（设计文档 §7：大字地点列表，无卡片框） */
+/** 地点归组键：有名用名（可手动归并），无名按坐标就近聚合（约百米粒度） */
+private fun placeKeyOf(g: GeoPhoto): String = g.photo.placeName ?: "%.3f,%.3f".format(g.lat, g.lng)
+
+/** 按地点聚合的列表行（设计文档 §7：大字地点列表，无卡片框） */
 private data class PlaceGroup(val name: String, val cover: String, val photos: Int, val days: Int)
 
 private fun groupPlaces(points: List<GeoPhoto>): List<PlaceGroup> =
     points
-        .groupBy { it.photo.placeName ?: "%.3f,%.3f".format(it.lat, it.lng) }
+        .groupBy { placeKeyOf(it) }
         .map { (_, list) ->
             PlaceGroup(
                 name = list.first().photo.placeName ?: "%.4f, %.4f".format(list.first().lat, list.first().lng),
@@ -276,7 +290,7 @@ private fun groupPlaces(points: List<GeoPhoto>): List<PlaceGroup> =
         }
         .sortedByDescending { it.photos }
 
-/** 照片裁圆 + 白描边 → 圆形足迹钉图标（替代 osmdroid 默认大头钉） */
+/** 照片裁圆 + 白描边 → 圆形照片钉图标 */
 private fun circlePhotoDrawable(ctx: Context, path: String, sizeDp: Float): Drawable? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(path, bounds)
@@ -310,9 +324,136 @@ private fun circlePhotoDrawable(ctx: Context, path: String, sizeDp: Float): Draw
     return BitmapDrawable(ctx.resources, out)
 }
 
-/** 行迹地图：高德真地图 + 白描边轨迹线 + 照片圆形足迹钉 + 地点大字列表 */
+/** 聚合气泡：主照片圆 + 右上角墨色计数徽章（缩小时相邻照片合成一点，放大自动散开） */
+private fun clusterDrawable(ctx: Context, firstPhotoPath: String, count: Int, sizeDp: Float): Drawable? {
+    val density = ctx.resources.displayMetrics.density
+    val sizePx = (sizeDp * density).toInt().coerceIn(40, 200)
+    val base = circlePhotoDrawable(ctx, firstPhotoPath, sizeDp.toFloat()) as? BitmapDrawable
+    val baseBmp = base?.bitmap ?: return null
+    val out = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(out)
+    canvas.drawBitmap(baseBmp, 0f, 0f, null)
+    val badgeR = 9f * density
+    val cx = sizePx - badgeR
+    val cy = badgeR
+    canvas.drawCircle(cx, cy, badgeR, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF22312A.toInt() })
+    canvas.drawCircle(
+        cx,
+        cy,
+        badgeR,
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 2f * density
+            color = android.graphics.Color.WHITE
+        },
+    )
+    canvas.drawText(
+        count.toString(),
+        cx,
+        cy + 3.8f * density,
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            textSize = 11f * density
+            textAlign = Paint.Align.CENTER
+            isFakeBoldText = true
+        },
+    )
+    return BitmapDrawable(ctx.resources, out)
+}
+
+/** 屏幕距离聚类：相邻 < clusterPx 的照片合成一个节点（每次缩放后按当前投影重算） */
+private fun clusterNodes(map: MapView, points: List<GeoPhoto>, clusterPx: Float): List<MapNode> {
+    val proj = map.projection
+    val pts = points.map { g -> g to proj.toPixels(GeoPoint(g.lat, g.lng), null) }
+    val used = BooleanArray(pts.size)
+    val nodes = mutableListOf<MapNode>()
+    for (i in pts.indices) {
+        if (used[i]) continue
+        used[i] = true
+        val (ax, ay) = pts[i].second.x to pts[i].second.y.toFloat()
+        val group = mutableListOf(pts[i].first)
+        for (j in i + 1 until pts.size) {
+            if (used[j]) continue
+            val dx = pts[j].second.x - ax
+            val dy = pts[j].second.y - ay
+            if (dx * dx + dy * dy <= clusterPx * clusterPx) {
+                used[j] = true
+                group.add(pts[j].first)
+            }
+        }
+        nodes.add(MapNode(group, group.map { it.lat }.average(), group.map { it.lng }.average()))
+    }
+    return nodes
+}
+
+/** 地图节点：1 张=单照片钉，>1 张=聚合气泡 */
+private data class MapNode(val photos: List<GeoPhoto>, val lat: Double, val lng: Double)
+
+/** 大图查看器的状态：某地点的照片组 + 起始张 */
+private data class ViewerState(val photos: List<PhotoUi>, val startIndex: Int)
+
+/** 全屏大图查看：左右切换同一地点的照片，点任意处关闭 */
 @Composable
-private fun TrailMap(geotagged: List<PhotoUi>) {
+private fun PhotoViewer(state: ViewerState, onDismiss: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        val pagerState = rememberPagerState(initialPage = state.startIndex) { state.photos.size }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color(0xFF0F1210))
+                .clickable(onClick = onDismiss),
+        ) {
+            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { i ->
+                AsyncImage(
+                    model = java.io.File(state.photos[i].path),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+            state.photos.getOrNull(pagerState.currentPage)?.let { p ->
+                Column(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .statusBarsPadding()
+                        .padding(16.dp),
+                ) {
+                    Text(
+                        p.placeName ?: "拍摄地点",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        SimpleDateFormat("M 月 d 日", Locale.CHINESE).format(Date(p.date.toEpochDay() * 86400000L)) +
+                            " · ${pagerState.currentPage + 1}/${state.photos.size}",
+                        color = Color.White.copy(alpha = 0.75f),
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 3.dp),
+                    )
+                }
+            }
+            Text(
+                "✕",
+                color = Color.White,
+                fontSize = 18.sp,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(14.dp)
+                    .clickable(onClick = onDismiss)
+                    .padding(4.dp),
+            )
+        }
+    }
+}
+
+/** 照片地图：高德底图 + 照片钉 + 缩放聚合 + 点击看同地点大图（2026-10-03 定案，替代旧"行迹"轨迹线） */
+@Composable
+private fun PhotoMap(geotagged: List<PhotoUi>) {
     val points = geotagged.mapNotNull { p ->
         val lat = p.lat ?: return@mapNotNull null
         val lng = p.lng ?: return@mapNotNull null
@@ -320,7 +461,7 @@ private fun TrailMap(geotagged: List<PhotoUi>) {
     }
     if (points.isEmpty()) {
         Text(
-            "拍照会自动记录拍摄地点（EXIF）——有了第一张带位置的照片，这里就会亮起足迹地图",
+            "拍照会自动记录拍摄地点（EXIF）——有了第一张带位置的照片，这里就会亮起照片地图",
             style = MaterialTheme.typography.bodyMedium,
             color = SubInk,
             modifier = Modifier.padding(vertical = 14.dp),
@@ -328,6 +469,8 @@ private fun TrailMap(geotagged: List<PhotoUi>) {
         return
     }
     val ctx = LocalContext.current
+    var viewer by remember { mutableStateOf<ViewerState?>(null) }
+    var clusterTick by remember { mutableIntStateOf(0) }
     val mapRadiusPx = 18f * ctx.resources.displayMetrics.density
     val mapView = remember {
         org.osmdroid.config.Configuration.getInstance().apply {
@@ -345,8 +488,19 @@ private fun TrailMap(geotagged: List<PhotoUi>) {
                     outline.setRoundRect(0, 0, view.width, view.height, mapRadiusPx)
                 }
             }
+            addMapListener(
+                object : MapListener {
+                    override fun onScroll(event: ScrollEvent?): Boolean = false
+                    override fun onZoom(event: ZoomEvent?): Boolean {
+                        clusterTick++
+                        return false
+                    }
+                },
+            )
         }
     }
+    // 读一下 tick：缩放发生时触发重组，让下面的 update 重新聚类
+    val tick = clusterTick
     AndroidView(
         modifier = Modifier
             .fillMaxWidth()
@@ -361,26 +515,42 @@ private fun TrailMap(geotagged: List<PhotoUi>) {
         },
         update = { map ->
             map.overlays.clear()
-            // 轨迹线：白色描边打底 + 草木绿主线（圆头圆拐角）
-            listOf(13f to android.graphics.Color.WHITE, 8f to GreenInk.toArgb()).forEach { (width, color) ->
-                map.overlays.add(
-                    Polyline(map).apply {
-                        setPoints(points.map { GeoPoint(it.lat, it.lng) })
-                        outlinePaint.strokeWidth = width
-                        outlinePaint.color = color
-                        outlinePaint.strokeCap = Paint.Cap.ROUND
-                        outlinePaint.strokeJoin = Paint.Join.ROUND
-                    },
-                )
-            }
-            points.forEach { g ->
+            val density = ctx.resources.displayMetrics.density
+            val nodes = clusterNodes(map, points, 46f * density)
+            nodes.forEach { node ->
                 map.overlays.add(
                     Marker(map).apply {
-                        position = GeoPoint(g.lat, g.lng)
+                        position = GeoPoint(node.lat, node.lng)
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                        circlePhotoDrawable(ctx, g.photo.path, 40f)?.let { icon = it }
-                        title = g.photo.placeName ?: "拍摄地点"
-                        subDescription = SimpleDateFormat("M 月 d 日", Locale.CHINESE).format(Date(g.photo.date.toEpochDay() * 86400000L))
+                        if (node.photos.size == 1) {
+                            circlePhotoDrawable(ctx, node.photos[0].photo.path, 40f)?.let { icon = it }
+                        } else {
+                            clusterDrawable(ctx, node.photos[0].photo.path, node.photos.size, 46f)?.let { icon = it }
+                        }
+                        setOnMarkerClickListener { _, _ ->
+                            val distinctPlaces = node.photos.map { placeKeyOf(it) }.distinct()
+                            val openViewer: () -> Unit = {
+                                if (node.photos.size == 1) {
+                                    // 单张：看大图，左右滑切换同一地点的全部照片
+                                    val key = placeKeyOf(node.photos[0])
+                                    val group = points.filter { placeKeyOf(it) == key }
+                                    val start = group.indexOfFirst { it.photo.id == node.photos[0].photo.id }.coerceAtLeast(0)
+                                    viewer = ViewerState(group.map { it.photo }, start)
+                                } else {
+                                    viewer = ViewerState(node.photos.map { it.photo }, 0)
+                                }
+                            }
+                            if (node.photos.size == 1 || distinctPlaces.size == 1 || map.zoomLevelDouble >= 17.0) {
+                                // 单点、或整组同一地点：直接看大图（同地点照片永远聚合在一起，
+                                // 等缩放拆开是等不到的）；缩放很深仍聚合时也直接看
+                                openViewer()
+                            } else {
+                                // 聚合点混着多个地点：放大散开再挑
+                                map.controller.animateTo(GeoPoint(node.lat, node.lng))
+                                map.controller.zoomIn()
+                            }
+                            true
+                        }
                     },
                 )
             }
@@ -407,8 +577,11 @@ private fun TrailMap(geotagged: List<PhotoUi>) {
     }
     Spacer(Modifier.height(8.dp))
     Text(
-        "📍 位置来自照片 EXIF，仅存本地 · 底图 © 高德地图",
+        "📍 照片按拍摄位置（EXIF）落点，仅存本地 · 缩小地图自动聚合 · 底图 © 高德地图",
         fontSize = 10.5.sp,
         color = SubInk,
     )
+    viewer?.let { state ->
+        PhotoViewer(state = state, onDismiss = { viewer = null })
+    }
 }

@@ -1,0 +1,308 @@
+package com.petdiary.parrot.feature.today
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.petdiary.parrot.core.designsystem.BirdAccents
+import java.time.LocalDate
+import java.time.format.TextStyle
+import java.util.Locale
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TodayScreen(
+    onBirdClick: (String) -> Unit,
+    onAppearanceToggle: () -> Unit,
+    appearanceDark: Boolean,
+    vm: TodayViewModel = hiltViewModel(),
+) {
+    val today = LocalDate.now()
+    val ui by vm.todayUi(today).collectAsState()
+    var showSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("今天") },
+                actions = {
+                    IconButton(onClick = onAppearanceToggle) {
+                        Icon(
+                            if (appearanceDark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
+                            contentDescription = "切换外观",
+                        )
+                    }
+                },
+            )
+        },
+        floatingActionButton = {
+            if (ui.hasBird) {
+                FloatingActionButton(onClick = { showSheet = true }) {
+                    Icon(Icons.Default.Add, contentDescription = "记一笔")
+                }
+            }
+        },
+    ) { padding ->
+        if (!ui.hasBird) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(padding).padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text("去「鸟」页添加第一只鸟吧 🦜", style = MaterialTheme.typography.titleMedium)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+            ) {
+                item { HeroCard(ui, ui.birds, vm::selectBird) { onBirdClick(ui.selectedBirdId ?: return@HeroCard) } }
+                item { Spacer(Modifier.height(4.dp)) }
+                item { WeekStrip(ui.weekDays, ui.weekCounts, today) }
+                item { Spacer(Modifier.height(6.dp)) }
+                item {
+                    Text(
+                        "${today.monthValue} 月 ${today.dayOfMonth} 日（今天）· ${ui.selectedDayRecords.size} 条记录",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(vertical = 10.dp),
+                    )
+                }
+                if (ui.selectedDayRecords.isEmpty()) {
+                    item {
+                        Text(
+                            "今天还没有记录，点右下角 ➕ 记一笔",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        )
+                    }
+                } else {
+                    items(ui.selectedDayRecords, key = { it.id }) { w ->
+                        RecordRow(w, ui.name)
+                    }
+                }
+                item { Spacer(Modifier.height(90.dp)) }
+            }
+        }
+    }
+
+    if (showSheet) {
+        WeightSheet(
+            birdName = ui.name,
+            initialGrams = ui.latestGrams,
+            onDismiss = { showSheet = false },
+            onSave = { grams ->
+                vm.recordWeight(grams)
+                showSheet = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun HeroCard(
+    ui: TodayUi,
+    birds: List<com.petdiary.parrot.data.local.PetEntity>,
+    onSelect: (String) -> Unit,
+    onOpenDetail: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(206.dp)
+            .background(
+                Brush.linearGradient(listOf(Color(0xFF123A2C), Color(0xFF1D5C3E))),
+                RoundedCornerShape(24.dp),
+            )
+            .clickable(onClick = onOpenDetail),
+    ) {
+        Text(
+            ui.initial,
+            fontSize = 104.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color.White.copy(alpha = 0.08f),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 0.dp, end = 10.dp),
+        )
+        Row(modifier = Modifier.align(Alignment.TopEnd).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            birds.forEach { b ->
+                val selected = b.id == ui.selectedBirdId
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .background(if (selected) Color.White else Color.White.copy(alpha = 0.18f), CircleShape)
+                        .clickable { onSelect(b.id) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(b.name.take(1), fontWeight = FontWeight.Bold, color = Color(0xFF1D5C3E))
+                }
+            }
+        }
+        Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
+            Text(ui.name, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+            Text(
+                listOfNotNull(ui.speciesName, ui.ageText).joinToString(" · "),
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.85f),
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GlassStat(ui.latestWeightText ?: "—", "最新体重")
+                GlassStat(ui.companionText ?: "—", "陪伴时间")
+                GlassStat("${ui.recordCount} 条", "记一笔数量")
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlassStat(value: String, label: String) {
+    Box(
+        modifier = Modifier
+            .background(Color.White.copy(alpha = 0.14f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+    ) {
+        Column {
+            Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(label, fontSize = 10.sp, color = Color.White.copy(alpha = 0.85f))
+        }
+    }
+}
+
+@Composable
+private fun WeekStrip(days: List<LocalDate>, counts: Map<LocalDate, Int>, today: LocalDate) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        days.forEach { d ->
+            val c = counts[d] ?: 0
+            val isToday = d == today
+            val bg = when {
+                c >= 3 -> MaterialTheme.colorScheme.primary
+                c == 2 -> Color(0xFFBFE0CD)
+                c == 1 -> MaterialTheme.colorScheme.primaryContainer
+                else -> MaterialTheme.colorScheme.surfaceVariant
+            }
+            val content = if (c >= 3) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(bg, RoundedCornerShape(13.dp))
+                    .then(if (isToday) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(13.dp)) else Modifier)
+                    .padding(vertical = 9.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "${d.dayOfMonth}",
+                        fontSize = 13.sp,
+                        fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.SemiBold,
+                        color = content,
+                    )
+                    Text(
+                        d.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.CHINESE),
+                        fontSize = 9.5.sp,
+                        color = content.copy(alpha = 0.65f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecordRow(w: com.petdiary.parrot.data.local.WeightLogEntity, birdName: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(11.dp),
+    ) {
+        Box(
+            modifier = Modifier.size(36.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(11.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("⚖", fontSize = 16.sp)
+        }
+        Column {
+            Text("$birdName 称重 ${w.grams} g", fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                java.time.Instant.ofEpochMilli(w.weighedAt).atZone(java.time.ZoneId.systemDefault())
+                    .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")),
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WeightSheet(birdName: String, initialGrams: Double?, onDismiss: () -> Unit, onSave: (Double) -> Unit) {
+    var grams by remember { mutableStateOf(initialGrams ?: 0.0) }
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Text("$birdName · 记体重", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp))
+        Text(
+            "%.1f".format(grams) + " g",
+            fontSize = 52.sp,
+            fontWeight = FontWeight.ExtraBold,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+            Button(onClick = { grams = (grams - 0.5).coerceAtLeast(0.1) }, enabled = grams > 0.6) { Text("−", fontSize = 22.sp) }
+            Spacer(Modifier.size(18.dp))
+            Button(onClick = { grams = grams + 0.5 }) { Text("＋", fontSize = 22.sp) }
+        }
+        Button(
+            onClick = { onSave((grams * 10).toInt() / 10.0) },
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            enabled = grams > 0,
+        ) {
+            Text("✓ 保存", fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+}

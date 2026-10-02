@@ -173,6 +173,9 @@ interface PlaceDao {
     @Upsert
     suspend fun upsert(place: PlaceEntity)
 
+    @Query("SELECT COUNT(*) FROM places")
+    suspend fun count(): Int
+
     @Query("SELECT * FROM places ORDER BY firstVisitAt IS NULL, firstVisitAt DESC")
     fun observeAll(): Flow<List<PlaceEntity>>
 }

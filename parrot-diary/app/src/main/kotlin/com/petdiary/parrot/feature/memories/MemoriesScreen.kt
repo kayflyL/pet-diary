@@ -219,6 +219,21 @@ private fun PhotoWall(photos: List<PhotoUi>) {
     }
 }
 
+/** 高德瓦片源：国内直连、中文标注、无需 Key（正式版可平滑升级高德 SDK） */
+private fun amapTileSource() = org.osmdroid.tileprovider.tilesource.XYTileSource(
+    "AMap",
+    0,
+    19,
+    256,
+    ".png",
+    arrayOf(
+        "https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
+        "https://webrd02.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
+        "https://webrd03.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
+        "https://webrd04.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
+    ),
+)
+
 /** 行迹地图：osmdroid 真地图 + 轨迹线 + 照片足迹 */
 @Composable
 private fun TrailMap(geotagged: List<PhotoUi>) {
@@ -238,8 +253,13 @@ private fun TrailMap(geotagged: List<PhotoUi>) {
     }
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val mapView = remember {
+        org.osmdroid.config.Configuration.getInstance().apply {
+            userAgentValue = ctx.packageName
+            osmdroidBasePath = java.io.File(ctx.filesDir, "osmdroid")
+            osmdroidTileCache = java.io.File(ctx.cacheDir, "osmdroid")
+        }
         MapView(ctx).apply {
-            setTileSource(TileSourceFactory.MAPNIK)
+            setTileSource(amapTileSource())
             setMultiTouchControls(true)
         }
     }

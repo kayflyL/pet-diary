@@ -26,6 +26,10 @@
             </intent-filter>
         </activity>
 
+        <meta-data
+            android:name="com.amap.api.v2.apikey"
+            android:value="f33caaf0aeb16055bbf6f834d2e0f15b" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

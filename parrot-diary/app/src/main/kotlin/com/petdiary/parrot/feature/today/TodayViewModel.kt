@@ -5,9 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.petdiary.parrot.core.designsystem.BirdAccents
 import com.petdiary.parrot.core.model.SpeciesCatalog
 import com.petdiary.parrot.core.util.AgeFormatter
+import com.petdiary.parrot.data.FoodRepository
 import com.petdiary.parrot.data.PetRepository
 import com.petdiary.parrot.data.PlaceRepository
 import com.petdiary.parrot.data.WeightRepository
+import com.petdiary.parrot.data.local.FoodEntity
 import com.petdiary.parrot.data.local.PetEntity
 import com.petdiary.parrot.data.local.WeightLogEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -52,7 +54,15 @@ class TodayViewModel @Inject constructor(
     petRepository: PetRepository,
     private val weightRepository: WeightRepository,
     placeRepository: PlaceRepository,
+    private val foodRepository: FoodRepository,
 ) : ViewModel() {
+
+    init {
+        viewModelScope.launch {
+            foodRepository.ensureBuiltinImported()
+            placeRepository.ensureHomePlace()
+        }
+    }
 
     init {
         viewModelScope.launch { placeRepository.ensureHomePlace() }
@@ -80,6 +90,25 @@ class TodayViewModel @Inject constructor(
     fun recordWeight(grams: Double) {
         val pet = selectedBird.value ?: return
         viewModelScope.launch { weightRepository.record(pet.id, grams) }
+    }
+
+    val allFoods: StateFlow<List<FoodEntity>> = foodRepository.observeAllFoods()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 该鸟标记为 ❤️ 最爱的食物 (foodId, 名称) */
+    val favoriteFoods: StateFlow<List<Pair<String, String>>> = selectedBird
+        .flatMapLatest { pet ->
+            if (pet == null) flowOf(emptyList())
+            else foodRepository.observePrefs(pet.id).combine(foodRepository.observeAllFoods()) { prefs, foods ->
+                val names = foods.associate { it.id to it.name }
+                prefs.filter { it.level == "LOVE" }.mapNotNull { p -> names[p.foodId]?.let { p.foodId to it } }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun recordFeed(foodId: String?, note: String? = null) {
+        val pet = selectedBird.value ?: return
+        viewModelScope.launch { foodRepository.recordFeed(pet.id, foodId, note = note) }
     }
 
     fun todayUi(today: LocalDate): StateFlow<TodayUi> =

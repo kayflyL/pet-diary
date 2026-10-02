@@ -1,9 +1,16 @@
 package com.petdiary.parrot.data
 
 import android.content.Context
+import com.petdiary.parrot.data.local.AppSettingDao
+import com.petdiary.parrot.data.local.AppSettingEntity
+import com.petdiary.parrot.data.local.FeedLogDao
 import com.petdiary.parrot.data.local.FoodDao
+import com.petdiary.parrot.data.local.FoodEntity
+import com.petdiary.parrot.data.local.FeedLogEntity
 import com.petdiary.parrot.data.local.PetDao
 import com.petdiary.parrot.data.local.PetEntity
+import com.petdiary.parrot.data.local.PetFoodPrefDao
+import com.petdiary.parrot.data.local.PetFoodPrefEntity
 import com.petdiary.parrot.data.local.WeightLogDao
 import com.petdiary.parrot.data.local.WeightLogEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -11,19 +18,94 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 
-/** 首启导入一次内置食物库；重复调用安全 */
+/** 食物库 + 饮食偏好 + 喂食记录的统一门面（APP设计文档.md §6） */
 @Singleton
 class FoodRepository @Inject constructor(
     private val foodDao: FoodDao,
+    private val prefDao: PetFoodPrefDao,
+    private val feedLogDao: FeedLogDao,
     @ApplicationContext private val context: Context,
 ) {
+
+    /** 首启导入一次内置食物库（36 种）；重复调用安全 */
     suspend fun ensureBuiltinImported(): Int {
         if (foodDao.builtinCount() == 0) {
             val json = context.assets.open("foods.json").bufferedReader().use { it.readText() }
             foodDao.insertAll(FoodImporter.parse(json, System.currentTimeMillis()))
         }
         return foodDao.builtinCount()
+    }
+
+    fun observeAllFoods(): Flow<List<FoodEntity>> = foodDao.observeAll()
+    suspend fun foodById(id: String): FoodEntity? = foodDao.getById(id)
+    suspend fun foodNames(): Map<String, String> =
+        foodDao.observeAll().first().associate { it.id to it.name }
+
+    fun observePrefs(petId: String): Flow<List<PetFoodPrefEntity>> = prefDao.observeForPet(petId)
+
+    /** 偏好标记：已存在则更新等级，否则插入（表上唯一索引 ABORT 兜底） */
+    suspend fun markPref(petId: String, foodId: String, level: String) {
+        val existing = prefDao.findFor(petId, foodId)
+        if (existing != null) {
+            prefDao.update(existing.copy(level = level, updatedAt = System.currentTimeMillis()))
+        } else {
+            prefDao.insert(
+                PetFoodPrefEntity(
+                    id = UUID.randomUUID().toString(),
+                    petId = petId,
+                    foodId = foodId,
+                    level = level,
+                    updatedAt = System.currentTimeMillis(),
+                ),
+            )
+        }
+    }
+
+    suspend fun addCustomFood(name: String, category: String = "OTHER") {
+        foodDao.insertAll(
+            listOf(
+                FoodEntity(
+                    id = UUID.randomUUID().toString(),
+                    name = name.trim(),
+                    category = category,
+                    safety = "SAFE",
+                    isBuiltin = false,
+                    createdAt = System.currentTimeMillis(),
+                ),
+            ),
+        )
+    }
+
+    /** 记喂食：foodId 可空（自由记录） */
+    suspend fun recordFeed(
+        petId: String,
+        foodId: String? = null,
+        note: String? = null,
+        at: Long = System.currentTimeMillis(),
+    ) {
+        val type = foodId?.let { id -> foodDao.getById(id)?.category?.let { mapType(it) } } ?: "OTHER"
+        feedLogDao.insert(
+            FeedLogEntity(
+                id = UUID.randomUUID().toString(),
+                petId = petId,
+                foodId = foodId,
+                type = type,
+                note = note,
+                fedAt = at,
+                createdAt = at,
+                updatedAt = at,
+            ),
+        )
+    }
+
+    private fun mapType(foodCategory: String) = when (foodCategory) {
+        "GRAIN_SEED" -> "SEED"
+        "PELLET" -> "PELLET"
+        "VEGGIE", "FRUIT" -> "VEGGIE"
+        else -> "OTHER"
     }
 }
 

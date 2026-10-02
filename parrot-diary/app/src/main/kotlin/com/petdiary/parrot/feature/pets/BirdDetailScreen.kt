@@ -1,6 +1,7 @@
 package com.petdiary.parrot.feature.pets
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -40,6 +42,7 @@ import java.time.LocalDate
 fun BirdDetailScreen(
     onEdit: () -> Unit,
     onBack: () -> Unit,
+    onOpenFoodLib: (String) -> Unit = {},
     vm: BirdDetailViewModel = hiltViewModel(),
 ) {
     val pet by vm.bird.collectAsState()
@@ -139,6 +142,55 @@ fun BirdDetailScreen(
                         weights = weights,
                         refRangeG = pet?.let { com.petdiary.parrot.core.model.SpeciesCatalog.refRangeOf(it.speciesId) },
                     )
+                }
+            }
+            val diet by vm.diet.collectAsState()
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+                    .clickable { onOpenFoodLib(vm.petId) },
+            ) {
+                Column(Modifier.padding(15.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("饮食", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text("管理偏好 ›", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    if (diet.favorites.isEmpty() && diet.shares.isEmpty()) {
+                        Text(
+                            "在食物库标记最爱，喂食几次后这里会出现构成统计",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        if (diet.favorites.isNotEmpty()) {
+                            Text(
+                                "最爱：" + diet.favorites.joinToString(" · "),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                        }
+                        diet.shares.take(4).forEach { s ->
+                            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(s.name, modifier = Modifier.width(64.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Box(
+                                    Modifier
+                                        .weight(1f)
+                                        .height(8.dp)
+                                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                                ) {
+                                    Box(
+                                        Modifier
+                                            .fillMaxWidth(s.pct / 100f)
+                                            .height(8.dp)
+                                            .background(MaterialTheme.colorScheme.primary, CircleShape),
+                                    )
+                                }
+                                Text("${s.count} 次", modifier = Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
                 }
             }
             ui.notes?.let { InfoCard("备注") { Text(it, style = MaterialTheme.typography.bodyMedium) } }

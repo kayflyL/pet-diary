@@ -24,11 +24,13 @@ import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -62,7 +64,9 @@ fun TodayScreen(
 ) {
     val today = LocalDate.now()
     val ui by vm.todayUi(today).collectAsState()
-    var showSheet by remember { mutableStateOf(false) }
+    val favoriteFoods by vm.favoriteFoods.collectAsState()
+    val allFoods by vm.allFoods.collectAsState()
+    var sheet by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState()
 
     Scaffold(
@@ -81,7 +85,7 @@ fun TodayScreen(
         },
         floatingActionButton = {
             if (ui.hasBird) {
-                FloatingActionButton(onClick = { showSheet = true }) {
+                FloatingActionButton(onClick = { sheet = "menu" }) {
                     Icon(Icons.Default.Add, contentDescription = "记一笔")
                 }
             }
@@ -131,14 +135,30 @@ fun TodayScreen(
         }
     }
 
-    if (showSheet) {
-        WeightSheet(
+    when (sheet) {
+        "menu" -> ModalBottomSheet(onDismissRequest = { sheet = null }, sheetState = sheetState) {
+            Text("记一笔 · ${ui.name}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp))
+            SheetRow("⚖", "记体重", "默认上次 ${ui.latestWeightText ?: "—"}") { sheet = "weight" }
+            SheetRow("🌾", "记喂食", "最爱食物优先") { sheet = "feed" }
+            Spacer(Modifier.height(14.dp))
+        }
+        "weight" -> WeightSheet(
             birdName = ui.name,
             initialGrams = ui.latestGrams,
-            onDismiss = { showSheet = false },
+            onDismiss = { sheet = null },
             onSave = { grams ->
                 vm.recordWeight(grams)
-                showSheet = false
+                sheet = null
+            },
+        )
+        "feed" -> FeedSheet(
+            birdName = ui.name,
+            favorites = favoriteFoods,
+            allFoods = allFoods,
+            onDismiss = { sheet = null },
+            onSave = { foodId, note ->
+                vm.recordFeed(foodId, note)
+                sheet = null
             },
         )
     }
@@ -279,8 +299,7 @@ private fun RecordRow(w: com.petdiary.parrot.data.local.WeightLogEntity, birdNam
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun WeightSheet(birdName: String, initialGrams: Double?, onDismiss: () -> Unit, onSave: (Double) -> Unit) {
-    var grams by remember { mutableStateOf(initialGrams ?: 0.0) }
+private fun WeightSheet(birdName: String, initialGrams: Double?, onDismiss: () -> Unit, onSave: (Double) -> Unit) {    var grams by remember { mutableStateOf(initialGrams ?: 0.0) }
     val sheetState = rememberModalBottomSheetState()
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Text("$birdName · 记体重", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp))
@@ -300,6 +319,75 @@ private fun WeightSheet(birdName: String, initialGrams: Double?, onDismiss: () -
             onClick = { onSave((grams * 10).toInt() / 10.0) },
             modifier = Modifier.fillMaxWidth().height(52.dp),
             enabled = grams > 0,
+        ) {
+            Text("✓ 保存", fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
+@Composable
+private fun SheetRow(ico: String, title: String, sub: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(ico, fontSize = 20.sp)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FeedSheet(
+    birdName: String,
+    favorites: List<Pair<String, String>>,
+    allFoods: List<com.petdiary.parrot.data.local.FoodEntity>,
+    onDismiss: () -> Unit,
+    onSave: (String?, String?) -> Unit,
+) {
+    var selectedFoodId by remember { mutableStateOf<String?>(null) }
+    var note by remember { mutableStateOf("") }
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Text("$birdName · 记喂食", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp))
+        Text(
+            "最爱食物优先 · 点选后保存",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 10.dp),
+        )
+        Text("❤️ 最爱", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 10.dp)) {
+            favorites.forEach { (id, name) ->
+                FilterChip(selected = selectedFoodId == id, onClick = { selectedFoodId = id }, label = { Text("$name ❤️") })
+            }
+            if (favorites.isEmpty()) Text("还没有最爱标记，去食物库标一个", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text("其他常吃", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 10.dp)) {
+            // 禁吃食物不进入快捷选择（§6.3）
+            allFoods.filter { f -> favorites.none { it.first == f.id } && f.safety != "DANGER" }.take(5).forEach { f ->
+                FilterChip(selected = selectedFoodId == f.id, onClick = { selectedFoodId = f.id }, label = { Text(f.name) })
+            }
+        }
+        OutlinedTextField(
+            value = note,
+            onValueChange = { note = it },
+            label = { Text("备注（可选）") },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Button(
+            onClick = { onSave(selectedFoodId, note.ifBlank { null }) },
+            enabled = selectedFoodId != null || note.isNotBlank(),
+            modifier = Modifier.fillMaxWidth().height(52.dp).padding(top = 12.dp),
         ) {
             Text("✓ 保存", fontWeight = FontWeight.Bold)
         }

@@ -33,6 +33,7 @@ import androidx.navigation.navArgument
 import com.petdiary.parrot.core.designsystem.ParrotDiaryTheme
 import com.petdiary.parrot.data.SettingsRepository
 import com.petdiary.parrot.feature.me.MeScreen
+import com.petdiary.parrot.feature.food.FoodLibScreen
 import com.petdiary.parrot.feature.memories.MemoriesScreen
 import com.petdiary.parrot.feature.pets.AddEditBirdScreen
 import com.petdiary.parrot.feature.pets.BirdDetailScreen
@@ -145,7 +146,12 @@ fun AppNavHost(appearance: String, onCycleAppearance: () -> Unit) {
                 BirdDetailScreen(
                     onEdit = { nav.navigate("bird/edit?petId=$petId") },
                     onBack = { nav.popBackStack() },
+                    onOpenFoodLib = { nav.navigate("food/$petId") },
                 )
+            }
+            composable("food/{petId}") { entry ->
+                val petId = entry.arguments?.getString("petId").orEmpty()
+                FoodLibScreen(petId = petId, onBack = { nav.popBackStack() })
             }
         }
     }

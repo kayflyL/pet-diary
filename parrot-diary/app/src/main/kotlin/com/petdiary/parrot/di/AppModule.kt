@@ -32,7 +32,7 @@ object AppModule {
 
     @Provides fun petDao(db: ParrotDiaryDatabase): PetDao = db.petDao()
     @Provides fun weightLogDao(db: ParrotDiaryDatabase): WeightLogDao = db.weightLogDao()
-    // [M1 调试] @Provides fun feedLogDao(db: ParrotDiaryDatabase): FeedLogDao = db.feedLogDao()
+    @Provides fun feedLogDao(db: ParrotDiaryDatabase): FeedLogDao = db.feedLogDao()
     @Provides fun diaryDao(db: ParrotDiaryDatabase): DiaryDao = db.diaryDao()
     @Provides fun healthRecordDao(db: ParrotDiaryDatabase): HealthRecordDao = db.healthRecordDao()
     @Provides fun reminderDao(db: ParrotDiaryDatabase): ReminderDao = db.reminderDao()

@@ -6,14 +6,19 @@ import androidx.lifecycle.viewModelScope
 import com.petdiary.parrot.core.designsystem.BirdAccents
 import com.petdiary.parrot.core.model.SpeciesCatalog
 import com.petdiary.parrot.core.util.AgeFormatter
+import com.petdiary.parrot.core.util.DietStats
 import com.petdiary.parrot.data.PetRepository
 import com.petdiary.parrot.data.WeightRepository
+import com.petdiary.parrot.data.local.FoodDao
+import com.petdiary.parrot.data.local.FeedLogDao
 import com.petdiary.parrot.data.local.PetEntity
+import com.petdiary.parrot.data.local.PetFoodPrefDao
 import com.petdiary.parrot.data.local.WeightLogEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 @HiltViewModel
@@ -21,6 +26,9 @@ class BirdDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     petRepository: PetRepository,
     weightRepository: WeightRepository,
+    feedLogDao: FeedLogDao,
+    foodDao: FoodDao,
+    prefDao: PetFoodPrefDao,
 ) : ViewModel() {
 
     val petId: String = checkNotNull(savedStateHandle["petId"])
@@ -36,7 +44,21 @@ class BirdDetailViewModel @Inject constructor(
 
     val recordCount: StateFlow<Int> = weightRepository.observeCount(petId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    /** 饮食卡片：最爱（手动标记）+ 最近 30 天实际构成（DietStats） */
+    val diet: StateFlow<DietUi> = combine(
+        feedLogDao.observeForPet(petId),
+        foodDao.observeAll(),
+        prefDao.observeForPet(petId),
+    ) { feeds, foods, prefs ->
+        val names = foods.associate { it.id to it.name }
+        val favorites = prefs.filter { it.level == "LOVE" }.mapNotNull { names[it.foodId] }
+        val shares = DietStats.compute(feeds.map { it.fedAt to it.foodId }, names, System.currentTimeMillis())
+        DietUi(favorites = favorites, shares = shares)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DietUi(emptyList(), emptyList()))
 }
+
+data class DietUi(val favorites: List<String>, val shares: List<DietStats.FoodShare>)
 
 /** 详情页展示派生数据 */
 data class BirdDetailUi(

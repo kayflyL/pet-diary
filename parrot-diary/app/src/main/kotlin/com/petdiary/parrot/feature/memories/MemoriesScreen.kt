@@ -10,6 +10,7 @@ import android.graphics.Paint
 import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,19 +24,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -45,6 +48,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -54,7 +59,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.time.LocalDate
 import java.util.Date
 import java.util.Locale
 import org.osmdroid.events.MapListener
@@ -65,15 +72,21 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import kotlin.math.roundToInt
 
 /** 地点大字列表的轮换色（设计文档 §7：绿/蓝/琥珀交替） */
 private val placeColors = listOf(Color(0xFF2F8F5B), Color(0xFF4A7FB5), Color(0xFFB07A16))
+
+/** 巨型文字 Tab 未选中态的浅灰（原型 .mt 色） */
+private val TabIdle = Color(0xFFC7C9CC)
 
 /** 回忆 · 纸面（APP设计文档.md §7，StoryTeller 结构）· 数据来自 MemoriesViewModel */
 @Composable
 fun MemoriesScreen(vm: MemoriesViewModel = hiltViewModel()) {
     val ui by vm.ui.collectAsState()
     var seg by remember { mutableIntStateOf(0) }
+    val scrollState = rememberScrollState()
+    var viewer by remember { mutableStateOf<ViewerState?>(null) }
     val placeCount = ui.geotagged
         .groupBy { it.placeName ?: "%.3f,%.3f".format(it.lat ?: 0.0, it.lng ?: 0.0) }
         .size
@@ -85,7 +98,7 @@ fun MemoriesScreen(vm: MemoriesViewModel = hiltViewModel()) {
                     .fillMaxSize()
                     .padding(padding)
                     .background(PaperBg)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
                     .padding(18.dp),
             ) {
                 Text(
@@ -95,101 +108,76 @@ fun MemoriesScreen(vm: MemoriesViewModel = hiltViewModel()) {
                     color = GreenInk,
                     fontWeight = FontWeight.Bold,
                 )
-                Text("回忆", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(top = 4.dp))
+                // 巨型文字 Tab：大号文字即页签（StoryTeller DNA ①）
+                Row(Modifier.padding(top = 4.dp)) {
+                    listOf("故事", "地图", "照片").forEachIndexed { i, label ->
+                        Text(
+                            label,
+                            fontSize = 27.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = (-0.5).sp,
+                            color = if (seg == i) PaperInk else TabIdle,
+                            modifier = Modifier
+                                .padding(end = 13.dp)
+                                .clickable { seg = i },
+                        )
+                    }
+                }
                 Text(
                     "${ui.stories.size} 个故事 · ${ui.photos.size} 张照片 · $placeCount 个地方",
                     fontSize = 12.sp,
                     color = SubInk,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
+                    modifier = Modifier.padding(top = 4.dp),
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(bottom = 14.dp)) {
-                    listOf("故事", "照片", "地图").forEachIndexed { i, label ->
-                        FilterChip(selected = seg == i, onClick = { seg = i }, label = { Text(label) })
-                    }
-                }
+                QuoteBlock()
 
+                // 分段切换暂不做过渡动画：AnimatedContent 会让互操作 MapView 以 0 高
+                // 参与 Compose 布局（View 实际仍按 656px 绘制，压住列表），
+                // 待找到互操作安全的方案再补（§9 的 180ms 淡入位移暂缓）
                 when (seg) {
-                    0 -> StoryList(ui.stories)
-                    1 -> PhotoWall(ui.photos)
-                    else -> PhotoMap(ui.geotagged)
+                    0 -> StoryWall(ui.stories, scrollState)
+                    1 -> PhotoMap(ui.geotagged) { viewer = it }
+                    else -> PhotoWall(ui.photos) { viewer = it }
                 }
             }
         }
+        viewer?.let { state ->
+            PhotoViewer(state = state, onDismiss = { viewer = null })
+        }
     }
 }
 
-/** 故事卡：照片全出血 + 标题压图（StoryTeller "BEACH — 18 IMAGES" 式） */
+/** 引言块：StoryTeller 情感设计的点睛（原型 .mquote，纯排版无框线） */
 @Composable
-private fun StoryCard(story: StoryUi) {
-    Column(Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
+private fun QuoteBlock() {
+    Column(Modifier.padding(top = 14.dp, bottom = 16.dp)) {
         Text(
-            "${story.date.monthValue} 月 ${story.date.dayOfMonth} 日 · " + story.petNames.joinToString("、"),
-            style = MaterialTheme.typography.labelMedium,
-            color = SubInk,
-            modifier = Modifier.padding(bottom = 7.dp),
+            "把照片重新变回事件",
+            fontSize = 16.5.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = (-0.3).sp,
+            color = PaperInk,
         )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1.45f)
-                .clip(RoundedCornerShape(18.dp))
-                .background(GreenInkSoft),
-        ) {
-            if (story.firstPhotoPath != null) {
-                AsyncImage(
-                    model = java.io.File(story.firstPhotoPath),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.linearGradient(listOf(Color(0xFFBFE3CE), Color(0xFF5FA97E))),
-                        ),
-                )
-            }
-            Column(
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xAA10291A))))
-                    .padding(12.dp),
-            ) {
-                Text(
-                    when {
-                        story.texts.isNotEmpty() -> story.texts.first().take(16)
-                        else -> story.date.let { "${it.monthValue} 月 ${it.dayOfMonth} 日" }
-                    },
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                )
-                Text(
-                    "${story.entryCount} 条日记 · ${story.photoCount} 张照片",
-                    fontSize = 11.sp,
-                    color = Color.White.copy(alpha = 0.85f),
-                )
-            }
-        }
-        // 卡下摘要只放第二条日记（第一条已压在图上，避免同句重复）
-        story.texts.getOrNull(1)?.let { t ->
-            Text(
-                t,
-                fontSize = 13.sp,
-                color = SubInk,
-                modifier = Modifier.padding(top = 8.dp),
-                maxLines = 2,
-            )
-        }
+        Text(
+            "每一次称重、每一顿饭、每一张照片，都是你们共同经历的情感元数据。地图不只是定位，是讲故事时重踏的足迹。",
+            fontSize = 12.5.sp,
+            color = SubInk,
+            lineHeight = 21.sp,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Text(
+            "—— 设计理念致敬 Nokia Storyteller",
+            fontSize = 10.5.sp,
+            color = SubInk.copy(alpha = 0.75f),
+            modifier = Modifier.padding(top = 5.dp),
+        )
     }
 }
 
+/** 故事墙：左侧月份竖轨 + 双列瀑布流（StoryTeller DNA ②）；竖轨可点、随滚动联动高亮 */
 @Composable
-private fun StoryList(stories: List<StoryUi>) {
+private fun StoryWall(stories: List<StoryUi>, scrollState: ScrollState) {
     if (stories.isEmpty()) {
         Text(
             "还没有故事。在「今天」写一条日记，同一天的照片和日记会自动打包成一个故事。",
@@ -198,14 +186,127 @@ private fun StoryList(stories: List<StoryUi>) {
         )
         return
     }
-    stories.forEach { story ->
-        StoryCard(story)
+    val months = remember(stories) {
+        stories.map { it.date.withDayOfMonth(1) }.distinct().sortedDescending()
+    }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    // 各月份首块在滚动内容里的 y 偏移（用于竖轨联动与点击定位）
+    val monthTops = remember { mutableStateMapOf<LocalDate, Int>() }
+    var contentRootY by remember { mutableStateOf(0f) }
+    val activeMonth by remember(months) {
+        derivedStateOf {
+            monthTops.entries
+                .filter { it.value <= scrollState.value + 40 }
+                .maxByOrNull { it.value }?.key ?: months.first()
+        }
+    }
+
+    Row(Modifier.fillMaxWidth().onGloballyPositioned { contentRootY = it.positionInRoot().y }) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.width(34.dp),
+        ) {
+            months.forEach { m ->
+                val on = m == activeMonth
+                Text(
+                    "${m.monthValue}月",
+                    fontSize = 9.5.sp,
+                    fontWeight = if (on) FontWeight.ExtraBold else FontWeight.Normal,
+                    color = if (on) GreenInk else SubInk,
+                    modifier = Modifier.clickable {
+                        monthTops[m]?.let { top ->
+                            scope.launch { scrollState.animateScrollTo((top - 8).coerceAtLeast(0)) }
+                        }
+                    },
+                )
+            }
+        }
+        // 双列瀑布流：按全局序号循环高度比，两列交错
+        val ratios = listOf(1f, 1.28f, 0.9f, 1.15f)
+        val columns = listOf(
+            stories.filterIndexed { i, _ -> i % 2 == 0 },
+            stories.filterIndexed { i, _ -> i % 2 == 1 },
+        )
+        val firstOfMonth = remember(stories) {
+            stories.groupBy { it.date.withDayOfMonth(1) }.mapValues { (_, v) -> v.first().date }
+        }
+        Row(Modifier.weight(1f).padding(start = 10.dp)) {
+            columns.forEach { col ->
+                Column(Modifier.weight(1f)) {
+                    col.forEach { story ->
+                        val ratio = ratios[(stories.indexOf(story)) % ratios.size]
+                        StoryTile(
+                            story = story,
+                            ratio = ratio,
+                            onAnchor = {
+                                if (firstOfMonth[story.date.withDayOfMonth(1)] == story.date) {
+                                    monthTops[story.date.withDayOfMonth(1)] =
+                                        (it.positionInRoot().y - contentRootY).roundToInt()
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
-/** 照片墙：按月分组的方片网格 */
+/** 瀑布流故事瓦片：照片全出血 + 压字（原型 .stile） */
 @Composable
-private fun PhotoWall(photos: List<PhotoUi>) {
+private fun StoryTile(story: StoryUi, ratio: Float, onAnchor: (androidx.compose.ui.layout.LayoutCoordinates) -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .aspectRatio(ratio)
+            .clip(RoundedCornerShape(16.dp))
+            .background(GreenInkSoft)
+            .onGloballyPositioned { onAnchor(it) },
+    ) {
+        if (story.firstPhotoPath != null) {
+            AsyncImage(
+                model = java.io.File(story.firstPhotoPath),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Brush.linearGradient(listOf(Color(0xFFBFE3CE), Color(0xFF5FA97E)))),
+            )
+        }
+        Column(
+            Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0x990F2317))))
+                .padding(11.dp),
+        ) {
+            Text(
+                when {
+                    story.texts.isNotEmpty() -> story.texts.first().take(14)
+                    else -> "${story.date.monthValue} 月 ${story.date.dayOfMonth} 日"
+                },
+                fontSize = 14.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+            )
+            Text(
+                "${story.date.monthValue} 月 ${story.date.dayOfMonth} 日 · ${story.photoCount} 张 · ${story.entryCount} 条",
+                fontSize = 10.5.sp,
+                color = Color.White.copy(alpha = 0.85f),
+                modifier = Modifier.padding(top = 1.dp),
+            )
+        }
+    }
+}
+
+/** 照片墙：按月分组的方片网格，点任意一张全屏看大图（左右滑看全部） */
+@Composable
+private fun PhotoWall(photos: List<PhotoUi>, onOpenViewer: (ViewerState) -> Unit) {
     if (photos.isEmpty()) {
         Text("随手拍的照片会按月聚在这里", style = MaterialTheme.typography.bodyMedium, color = SubInk)
         return
@@ -229,7 +330,11 @@ private fun PhotoWall(photos: List<PhotoUi>) {
                             .weight(1f)
                             .aspectRatio(1f)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(GreenInkSoft),
+                            .background(GreenInkSoft)
+                            .clickable {
+                                val start = photos.indexOfFirst { it.id == p.id }.coerceAtLeast(0)
+                                onOpenViewer(ViewerState(photos, start))
+                            },
                         contentScale = ContentScale.Crop,
                     )
                 }
@@ -370,7 +475,8 @@ private fun clusterNodes(map: MapView, points: List<GeoPhoto>, clusterPx: Float)
     for (i in pts.indices) {
         if (used[i]) continue
         used[i] = true
-        val (ax, ay) = pts[i].second.x to pts[i].second.y.toFloat()
+        val ax = pts[i].second.x
+        val ay = pts[i].second.y.toFloat()
         val group = mutableListOf(pts[i].first)
         for (j in i + 1 until pts.size) {
             if (used[j]) continue
@@ -389,10 +495,10 @@ private fun clusterNodes(map: MapView, points: List<GeoPhoto>, clusterPx: Float)
 /** 地图节点：1 张=单照片钉，>1 张=聚合气泡 */
 private data class MapNode(val photos: List<GeoPhoto>, val lat: Double, val lng: Double)
 
-/** 大图查看器的状态：某地点的照片组 + 起始张 */
+/** 大图查看器的状态：某组照片 + 起始张 */
 private data class ViewerState(val photos: List<PhotoUi>, val startIndex: Int)
 
-/** 全屏大图查看：左右切换同一地点的照片，点任意处关闭 */
+/** 全屏大图查看：左右切换同组照片，点任意处关闭 */
 @Composable
 private fun PhotoViewer(state: ViewerState, onDismiss: () -> Unit) {
     Dialog(
@@ -453,7 +559,7 @@ private fun PhotoViewer(state: ViewerState, onDismiss: () -> Unit) {
 
 /** 照片地图：高德底图 + 照片钉 + 缩放聚合 + 点击看同地点大图（2026-10-03 定案，替代旧"行迹"轨迹线） */
 @Composable
-private fun PhotoMap(geotagged: List<PhotoUi>) {
+private fun PhotoMap(geotagged: List<PhotoUi>, onOpenViewer: (ViewerState) -> Unit) {
     val points = geotagged.mapNotNull { p ->
         val lat = p.lat ?: return@mapNotNull null
         val lng = p.lng ?: return@mapNotNull null
@@ -469,7 +575,6 @@ private fun PhotoMap(geotagged: List<PhotoUi>) {
         return
     }
     val ctx = LocalContext.current
-    var viewer by remember { mutableStateOf<ViewerState?>(null) }
     var clusterTick by remember { mutableIntStateOf(0) }
     val mapRadiusPx = 18f * ctx.resources.displayMetrics.density
     val mapView = remember {
@@ -535,9 +640,9 @@ private fun PhotoMap(geotagged: List<PhotoUi>) {
                                     val key = placeKeyOf(node.photos[0])
                                     val group = points.filter { placeKeyOf(it) == key }
                                     val start = group.indexOfFirst { it.photo.id == node.photos[0].photo.id }.coerceAtLeast(0)
-                                    viewer = ViewerState(group.map { it.photo }, start)
+                                    onOpenViewer(ViewerState(group.map { it.photo }, start))
                                 } else {
-                                    viewer = ViewerState(node.photos.map { it.photo }, 0)
+                                    onOpenViewer(ViewerState(node.photos.map { it.photo }, 0))
                                 }
                             }
                             if (node.photos.size == 1 || distinctPlaces.size == 1 || map.zoomLevelDouble >= 17.0) {
@@ -581,7 +686,4 @@ private fun PhotoMap(geotagged: List<PhotoUi>) {
         fontSize = 10.5.sp,
         color = SubInk,
     )
-    viewer?.let { state ->
-        PhotoViewer(state = state, onDismiss = { viewer = null })
-    }
 }

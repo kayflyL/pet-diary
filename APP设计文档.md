@@ -120,6 +120,8 @@ AppSetting(key, value)   // appearance 等
 
 色彩：浅色=白底 #FFFFFF/表面 #F6F7F8/墨字 #1B1C1E/**主色草木绿 #3D9A63**；深色=#111316/#1C1F23/#E7E9EA/#7FD3A2。主色管交互，每鸟强调色（6 套）只管"这是谁"。
 动效（M3 Expressive "有目的的动效"）：FAB 抽屉 spring 滑入(250ms)、保存回弹(≤400ms)、日历选中缩放(200ms)、段切换淡入位移(180ms)、深色切换交叉淡入(250ms)；尊重系统减弱动态；无装饰循环动画。
+
+**设计禁令（2026-10-03 增补，用户定）**：禁止"左侧彩色装饰条"、渐变横幅按钮等 AI 生成味元素。设计语言对齐 Nokia StoryTeller：浅纸色底、内容即界面（少盒子少框线）、彩色只给内容不给装饰、排版用字号层级与留白表达。回忆区=淡纸绿底(#F2F6F2)的 StoryTeller 纸面，引言用纯排版（去框线）。
 **「回忆」区 = StoryTeller 真实结构复刻（2026-10-02 已核对真实界面截图后修正）**：此前"暗色影院画布"是基于 Metro 常识的误判，已推翻。真实 StoryTeller 的设计 DNA（来自[设计师 Annina Koskinen 案例页](https://anninakoskinen.com/project/nokia-storyteller)与[真机截图](https://allaboutwindowsphone.com/flow/item/20458_Lumia_Storyteller_improvements.php)）：①**巨型文字 Tab**（timeline map favourites 直接用大号文字做页签，当前项着墨色、其余浅灰）；②**纸色地图 + 洋红/蓝双色的圆形计数气泡**（缩放时分裂/合并）；③**地点列表=大号彩色文字**（地名+张数，无卡片框）；④照片马赛克+故事压字。我们以白色主题+绿色系复刻这套结构。
 排版遵循 Metro 四支柱（大字排版/动效/内容大于装饰/诚实，源自 Windows Phone 设计语言）；故事卡横向滑动浏览（WP Panorama 手势致敬 Nokia StoryTeller）。
 依据：[m3.material.io](https://m3.material.io)（2026 UX Design Award）、[M3E in Compose 指南](https://medium.com/@androidlab/material-3-expressive-ui-in-compose-the-ultimate-guide-51c703e8e88a)、[Orizon 2026 趋势](https://www.orizon.co/blog/10-ui-ux-trends-that-will-shape-2026)、[Tubik 2026](https://tubikstudio.com/blog/ui-design-trends-2026)、[Figma Pawsome Companion](https://www.figma.com/community/file/1360166837210685517/pawsome-companion-20-ui-screens-designs-for-pet-caring-applications)。

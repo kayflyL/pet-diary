@@ -170,7 +170,12 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
 .pin .lb{font-size:10.5px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:2px 8px;margin-top:5px;font-weight:600}
 /* 回忆 · StoryTeller 情感设计 */
 .mcap{font-size:10px;letter-spacing:2.5px;color:var(--pri);font-weight:700;margin-bottom:5px}
-.mquote{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--pri);border-radius:12px;padding:11px 13px;font-size:12px;color:var(--sub);line-height:1.65;margin-bottom:14px}
+.mquote{padding:2px 2px 0;margin-bottom:16px}
+.mquote .qh{font-size:16.5px;font-weight:800;letter-spacing:-.3px;color:var(--ink);margin-bottom:4px}
+.mquote .qb{font-size:12.5px;color:var(--sub);line-height:1.7}
+.mquote .qs{font-size:10.5px;color:var(--sub);opacity:.75;margin-top:5px}
+#s-mem{background:#F2F6F2}
+[data-theme="dark"] #s-mem{background:var(--bg)}
 .mquote b{color:var(--ink)}
 .papermap .dpin{position:absolute;width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 3px 8px rgba(0,0,0,.25);transform:translate(-50%,-50%)}
 .papermap .cluster{position:absolute;width:62px;height:62px;border-radius:50%;border:3px solid #fff;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.28);transform:translate(-50%,-50%)}
@@ -379,7 +384,7 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
 </section>
 
 <!-- ════════ ② 回忆 ════════ -->
-<section class="screen" id="s-mem">
+<section class="screen" id="s-mem" style="background:#F2F6F2">
   <div class="mcap">MEMORIES · 情感元数据</div>
   <div class="h-row">
     <h1 style="font-size:27px;letter-spacing:-.5px;font-weight:800">
@@ -389,7 +394,11 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
     </h1>
     <span class="sub" style="align-self:flex-end">5 地点 · 103 张</span>
   </div>
-  <div class="mquote"><b>“把照片重新变回事件”</b> —— 每一次称重、每一顿饭、每一张照片，都是你们共同经历的<b>情感元数据</b>。地图不只是定位，是讲故事时重踏的足迹。（设计理念源自 Nokia StoryTeller）</div>
+  <div class="mquote">
+    <div class="qh">把照片重新变回事件</div>
+    <div class="qb">每一次称重、每一顿饭、每一张照片，都是你们共同经历的情感元数据。地图不只是定位，是讲故事时重踏的足迹。</div>
+    <div class="qs">—— 设计理念致敬 Nokia Storyteller</div>
+  </div>
 
   <div id="m-story">
     <div style="display:flex;gap:10px">

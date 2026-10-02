@@ -166,8 +166,8 @@ private fun TrailMap(geotagged: List<PhotoUi>) {
             MapView(c).apply {
                 setTileSource(TileSourceFactory.MAPNIK)
                 setMultiTouchControls(true)
-                controller.setZoom(9.0)
-                controller.setCenter(GeoPoint(points.first().first, points.first().second))
+                controller.setZoom(12.0)
+                controller.setCenter(GeoPoint(points.map { it.first }.average(), points.map { it.second }.average()))
                 points.forEach { (lat, lng, _) ->
                     overlays.add(
                         Marker(this).apply {

@@ -83,6 +83,12 @@ interface DiaryDao {
     @Query("SELECT * FROM diary_entries WHERE petId = :petId ORDER BY happenedAt DESC")
     fun observeForPet(petId: String): Flow<List<DiaryEntryEntity>>
 
+    @Query("SELECT * FROM diary_entries ORDER BY happenedAt DESC")
+    fun observeAll(): Flow<List<DiaryEntryEntity>>
+
+    @Query("SELECT * FROM diary_media ORDER BY createdAt DESC")
+    fun observeAllMedia(): Flow<List<DiaryMediaEntity>>
+
     @Query("SELECT * FROM diary_media WHERE entryId = :entryId ORDER BY sort")
     suspend fun mediaFor(entryId: String): List<DiaryMediaEntity>
 

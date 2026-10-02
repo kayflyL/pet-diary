@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.petdiary.parrot.core.designsystem.BirdAccents
 import com.petdiary.parrot.core.model.SpeciesCatalog
 import com.petdiary.parrot.core.util.AgeFormatter
+import com.petdiary.parrot.data.DiaryRepository
 import com.petdiary.parrot.data.FoodRepository
 import com.petdiary.parrot.data.PetRepository
 import com.petdiary.parrot.data.PlaceRepository
@@ -55,7 +56,25 @@ class TodayViewModel @Inject constructor(
     private val weightRepository: WeightRepository,
     placeRepository: PlaceRepository,
     private val foodRepository: FoodRepository,
+    private val diaryRepository: DiaryRepository,
 ) : ViewModel() {
+
+    init {
+        viewModelScope.launch {
+            foodRepository.ensureBuiltinImported()
+            placeRepository.ensureHomePlace()
+        }
+    }
+
+    fun saveDiary(text: String, tags: List<String>, photoUris: List<android.net.Uri>) {
+        val pet = selectedBird.value ?: return
+        viewModelScope.launch { diaryRepository.createEntry(pet.id, text, tags, photoUris) }
+    }
+
+    fun saveCameraPhoto(uri: android.net.Uri) {
+        val pet = selectedBird.value ?: return
+        viewModelScope.launch { diaryRepository.saveCameraPhoto(pet.id, uri) }
+    }
 
     init {
         viewModelScope.launch {

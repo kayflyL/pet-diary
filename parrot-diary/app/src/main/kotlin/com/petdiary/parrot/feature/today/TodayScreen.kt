@@ -1,5 +1,8 @@
 package com.petdiary.parrot.feature.today
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -48,6 +51,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.petdiary.parrot.core.designsystem.BirdAccents
 import java.time.LocalDate
@@ -68,6 +75,33 @@ fun TodayScreen(
     val allFoods by vm.allFoods.collectAsState()
     var sheet by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState()
+    val context = LocalContext.current
+
+    var pendingCameraUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val u = pendingCameraUri
+        pendingCameraUri = null
+        if (ok && u != null) vm.saveCameraPhoto(u)
+    }
+    val cameraPermLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            val f = java.io.File(context.cacheDir, "camera/${java.util.UUID.randomUUID()}.jpg").apply { parentFile?.mkdirs() }
+            val uri = androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".fileprovider", f)
+            pendingCameraUri = uri
+            cameraLauncher.launch(uri)
+        }
+    }
+    fun shoot() {
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            val f = java.io.File(context.cacheDir, "camera/${java.util.UUID.randomUUID()}.jpg").apply { parentFile?.mkdirs() }
+            val uri = androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".fileprovider", f)
+            pendingCameraUri = uri
+            cameraLauncher.launch(uri)
+        } else {
+            cameraPermLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -140,6 +174,8 @@ fun TodayScreen(
             Text("记一笔 · ${ui.name}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp))
             SheetRow("⚖", "记体重", "默认上次 ${ui.latestWeightText ?: "—"}") { sheet = "weight" }
             SheetRow("🌾", "记喂食", "最爱食物优先") { sheet = "feed" }
+            SheetRow("📷", "拍照", "随手拍进回忆 · 自动记录地点") { sheet = null; shoot() }
+            SheetRow("✏️", "写日记", "文字 + 照片 + 心情标签") { sheet = "diary" }
             Spacer(Modifier.height(14.dp))
         }
         "weight" -> WeightSheet(
@@ -158,6 +194,14 @@ fun TodayScreen(
             onDismiss = { sheet = null },
             onSave = { foodId, note ->
                 vm.recordFeed(foodId, note)
+                sheet = null
+            },
+        )
+        "diary" -> DiarySheet(
+            birdName = ui.name,
+            onDismiss = { sheet = null },
+            onSave = { text, tags, uris ->
+                vm.saveDiary(text, tags, uris)
                 sheet = null
             },
         )
@@ -294,6 +338,55 @@ private fun RecordRow(w: com.petdiary.parrot.data.local.WeightLogEntity, birdNam
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DiarySheet(
+    birdName: String,
+    onDismiss: () -> Unit,
+    onSave: (String, List<String>, List<android.net.Uri>) -> Unit,
+) {
+    var text by remember { mutableStateOf("") }
+    var tags by remember { mutableStateOf(setOf<String>()) }
+    var uris by remember { mutableStateOf<List<android.net.Uri>>(emptyList()) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(6)) { result ->
+        if (result.isNotEmpty()) uris = result
+    }
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Text("$birdName · 写日记", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp))
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            placeholder = { Text("今天的小${birdName.take(1)}…") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 3,
+        )
+        Text(
+            "从相册选择照片（最多 6 张，自动读取拍摄地点）",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = uris.isNotEmpty(), onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, label = { Text("🖼 选择照片 ${if (uris.isNotEmpty()) "(${uris.size})" else ""}") })
+        }
+        Text("心情标签", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            listOf("换羽", "洗澡", "放风", "精神好", "精神一般", "萎靡").forEach { tag ->
+                FilterChip(selected = tag in tags, onClick = { tags = if (tag in tags) tags - tag else tags + tag }, label = { Text(tag) })
+            }
+        }
+        Button(
+            onClick = { onSave(text, tags.toList(), uris); text = ""; uris = emptyList() },
+            enabled = text.isNotBlank() || uris.isNotEmpty(),
+            modifier = Modifier.fillMaxWidth().height(52.dp).padding(top = 14.dp),
+        ) {
+            Text("✓ 保存", fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(12.dp))
     }
 }
 

@@ -28,7 +28,9 @@ object AppModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): ParrotDiaryDatabase =
-        Room.databaseBuilder(context, ParrotDiaryDatabase::class.java, ParrotDiaryDatabase.NAME).build()
+        Room.databaseBuilder(context, ParrotDiaryDatabase::class.java, ParrotDiaryDatabase.NAME)
+            .addMigrations(ParrotDiaryDatabase.MIGRATION_1_2)
+            .build()
 
     @Provides fun petDao(db: ParrotDiaryDatabase): PetDao = db.petDao()
     @Provides fun weightLogDao(db: ParrotDiaryDatabase): WeightLogDao = db.weightLogDao()

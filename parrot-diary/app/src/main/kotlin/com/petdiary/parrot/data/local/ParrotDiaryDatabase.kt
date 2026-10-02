@@ -18,7 +18,7 @@ import androidx.room.RoomDatabase
         PlaceEntity::class,
         AppSettingEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class ParrotDiaryDatabase : RoomDatabase() {
@@ -36,5 +36,12 @@ abstract class ParrotDiaryDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "parrot_diary.db"
+
+        /** v1→v2：日记增加 tags 字段（M5） */
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN tags TEXT DEFAULT NULL")
+            }
+        }
     }
 }

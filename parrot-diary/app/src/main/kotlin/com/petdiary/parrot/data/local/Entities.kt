@@ -79,6 +79,7 @@ data class DiaryEntryEntity(
     @PrimaryKey val id: String,
     val petId: String,
     val text: String,
+    val tags: String? = null,                 // ["换羽","洗澡","放风","精神好"]（M5）
     val happenedAt: Long,
     val createdAt: Long,
     val updatedAt: Long,

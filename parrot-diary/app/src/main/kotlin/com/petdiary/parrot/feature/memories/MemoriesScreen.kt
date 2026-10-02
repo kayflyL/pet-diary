@@ -1,135 +1,195 @@
 package com.petdiary.parrot.feature.memories
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.hilt.navigation.compose.hiltViewModel
+import coil3.compose.AsyncImage
+import com.petdiary.parrot.core.designsystem.BirdAccents
+import java.time.Instant
+import java.time.ZoneId
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 
-private val CinemaBg = Color(0xFF0D1013)
-private val CinemaCard = Color(0xFF16191D)
-private val CinemaRoad = Color(0xFF1D2429)
-private val CinemaInk = Color(0xFFEDEEEF)
-private val CinemaSub = Color(0xFF8B9096)
-private val CinemaGreen = Color(0xFF7FD3A2)
-
-/**
- * 回忆 · 影院画布（APP设计文档.md §7，致敬 Nokia StoryTeller）
- * M5 接入真实数据；当前为视觉骨架。
- */
+/** 回忆 · 纸面（APP设计文档.md §7，StoryTeller 结构）· 数据来自 MemoriesViewModel */
 @Composable
-fun MemoriesScreen() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(CinemaBg)
-            .verticalScroll(rememberScrollState())
-            .padding(18.dp),
-    ) {
-        Text(
-            "MEMORIES",
-            fontSize = 10.5.sp,
-            letterSpacing = 2.5.sp,
-            color = CinemaGreen,
-            fontWeight = FontWeight.Bold,
-        )
-        Text("回忆", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold, color = CinemaInk)
-        Text(
-            "5 个地点 · 103 张照片 · 行迹 42 km",
-            fontSize = 12.sp,
-            color = CinemaSub,
-            modifier = Modifier.padding(top = 4.dp, bottom = 18.dp),
-        )
+fun MemoriesScreen(vm: MemoriesViewModel = hiltViewModel()) {
+    val ui by vm.ui.collectAsState()
+    var seg by remember { mutableIntStateOf(0) }
 
-        MapSkeleton()
+    PaperTheme {
+        Scaffold { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .background(PaperBg)
+                    .verticalScroll(rememberScrollState())
+                    .padding(18.dp),
+            ) {
+                Text(
+                    "MEMORIES",
+                    fontSize = 10.5.sp,
+                    letterSpacing = 2.5.sp,
+                    color = GreenInk,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text("回忆", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(top = 4.dp))
+                Text(
+                    "${ui.stories.size} 个故事 · ${ui.photos.size} 张照片 · ${ui.geotagged.size} 个足迹",
+                    fontSize = 12.sp,
+                    color = SubInk,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
+                )
 
-        Spacer(Modifier.height(18.dp))
-        Text("故事 · M5", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CinemaInk)
-        Text(
-            "同一天同一地的照片与日记会自动打包成一个故事\n——比如「人民公园半日游 · 6 张照片」",
-            fontSize = 12.5.sp,
-            color = CinemaSub,
-            modifier = Modifier.padding(top = 6.dp),
-        )
-        Spacer(Modifier.height(16.dp))
-        Text("照片 · M5", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CinemaInk)
-        Text(
-            "随手拍的照片会按月聚在这里，并可按地点回顾",
-            fontSize = 12.5.sp,
-            color = CinemaSub,
-            modifier = Modifier.padding(top = 6.dp),
-        )
-    }
-}
+                Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(bottom = 14.dp)) {
+                    listOf("故事", "照片", "行迹").forEachIndexed { i, label ->
+                        FilterChip(selected = seg == i, onClick = { seg = i }, label = { Text(label) })
+                    }
+                }
 
-@Composable
-private fun MapSkeleton() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(235.dp)
-            .background(CinemaCard, RoundedCornerShape(20.dp)),
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(14.dp)
-                .align(Alignment.TopCenter)
-                .background(CinemaRoad),
-        )
-        Box(
-            Modifier
-                .width(12.dp)
-                .height(200.dp)
-                .align(Alignment.CenterEnd)
-                .background(CinemaRoad),
-        )
-        MapPin("🏠", "家 · 大本营", Modifier.align(Alignment.TopStart).padding(start = 20.dp, top = 60.dp))
-        MapPin("🌳", "人民公园 · M5", Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = 120.dp))
-        Text(
-            "行迹地图 · M5 上线（高德地图 + 照片定位聚合）",
-            fontSize = 11.sp,
-            color = CinemaSub,
-            modifier = Modifier.align(Alignment.BottomStart).padding(10.dp),
-        )
-    }
-}
-
-@Composable
-private fun MapPin(
-    emoji: String,
-    label: String,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(26.dp)
-                .background(CinemaInk, RoundedCornerShape(topStart = 13.dp, topEnd = 13.dp, bottomEnd = 13.dp, bottomStart = 3.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(emoji, fontSize = 12.sp)
+                when (seg) {
+                    0 -> StoryList(ui.stories)
+                    1 -> PhotoWall(ui.photos)
+                    else -> TrailMap(ui.geotagged)
+                }
+            }
         }
-        Text(label, fontSize = 10.sp, color = CinemaSub, modifier = Modifier.padding(top = 3.dp))
+    }
+}
+
+@Composable
+private fun StoryList(stories: List<StoryUi>) {
+    if (stories.isEmpty()) {
+        EmptyHint("还没有故事。在「今天」写一条日记，同一天的照片和日记会自动打包成一个故事。")
+        return
+    }
+    stories.forEach { s ->
+        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                Box(modifier = Modifier.size(10.dp).background(GreenInk, CircleShape))
+                Text(
+                    "${s.date.monthValue} 月 ${s.date.dayOfMonth} 日 · " + s.petNames.joinToString("、"),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            if (s.firstPhotoPath != null) {
+                AsyncImage(
+                    model = java.io.File(s.firstPhotoPath),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxWidth().aspectRatio(1.6f).padding(top = 8.dp),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                )
+            }
+            s.texts.take(2).forEach { t ->
+                Text(t, fontSize = 12.5.sp, color = SubInk, modifier = Modifier.padding(top = 5.dp))
+            }
+            Text("${s.entryCount} 条日记 · ${s.photoCount} 张照片", fontSize = 11.sp, color = SubInk, modifier = Modifier.padding(top = 4.dp))
+        }
+    }
+}
+
+@Composable
+private fun PhotoWall(photos: List<PhotoUi>) {
+    if (photos.isEmpty()) {
+        EmptyHint("随手拍的照片会按月聚在这里")
+        return
+    }
+    val byMonth = photos.groupBy { it.date.withDayOfMonth(1) }.toSortedMap(compareByDescending { it.year * 100 + it.monthValue })
+    byMonth.forEach { (month, list) ->
+        Text(
+            "${month.year} 年 ${month.monthValue} 月 · ${list.size} 张",
+            fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SubInk,
+            modifier = Modifier.padding(top = 6.dp, bottom = 6.dp),
+        )
+        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            list.take(3).forEach { p ->
+                AsyncImage(
+                    model = java.io.File(p.path),
+                    contentDescription = null,
+                    modifier = Modifier.weight(1f).aspectRatio(1f),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrailMap(geotagged: List<PhotoUi>) {
+    val points = geotagged.mapNotNull { p ->
+        val lat = p.lat ?: return@mapNotNull null
+        val lng = p.lng ?: return@mapNotNull null
+        Triple(lat, lng, p)
+    }
+    if (points.isEmpty()) {
+        EmptyHint("拍照会自动记录拍摄地点（EXIF）——有了第一张带位置的照片，这里就会亮起足迹地图")
+        return
+    }
+    AndroidView(
+        modifier = Modifier.fillMaxWidth().height(250.dp),
+        factory = { c ->
+            MapView(c).apply {
+                setTileSource(TileSourceFactory.MAPNIK)
+                setMultiTouchControls(true)
+                controller.setZoom(9.0)
+                controller.setCenter(GeoPoint(points.first().first, points.first().second))
+                points.forEach { (lat, lng, _) ->
+                    overlays.add(
+                        Marker(this).apply {
+                            position = GeoPoint(lat, lng)
+                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                            title = "拍摄地点"
+                        },
+                    )
+                }
+            }
+        },
+    )
+    Spacer(Modifier.height(10.dp))
+    points.take(5).forEach { (lat, lng, p) ->
+        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(34.dp).background(GreenInkSoft, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+                Text("📷", fontSize = 14.sp)
+            }
+            Column(Modifier.padding(start = 10.dp)) {
+                Text("%.4f, %.4f".format(lat, lng), fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                Text(p.date.let { "${it.year}-${it.monthValue}-${it.dayOfMonth}" }, fontSize = 10.5.sp, color = SubInk)
+            }
+        }
     }
 }

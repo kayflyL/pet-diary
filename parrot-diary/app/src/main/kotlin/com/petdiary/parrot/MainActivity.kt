@@ -32,6 +32,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.petdiary.parrot.core.designsystem.ParrotDiaryTheme
 import com.petdiary.parrot.data.SettingsRepository
+import com.petdiary.parrot.feature.care.ExpensesScreen
+import com.petdiary.parrot.feature.care.RemindersScreen
 import com.petdiary.parrot.feature.me.MeScreen
 import com.petdiary.parrot.feature.food.FoodLibScreen
 import com.petdiary.parrot.feature.memories.MemoriesScreen
@@ -134,7 +136,16 @@ fun AppNavHost(appearance: String, onCycleAppearance: () -> Unit) {
                     onAddClick = { nav.navigate("bird/edit") },
                 )
             }
-            composable("me") { MeScreen(appearance = appearance, onCycleAppearance = onCycleAppearance) }
+            composable("me") {
+                MeScreen(
+                    appearance = appearance,
+                    onCycleAppearance = onCycleAppearance,
+                    onOpenReminders = { nav.navigate("reminders") },
+                    onOpenExpenses = { nav.navigate("expenses") },
+                )
+            }
+            composable("reminders") { RemindersScreen(onBack = { nav.popBackStack() }) }
+            composable("expenses") { ExpensesScreen(onBack = { nav.popBackStack() }) }
             composable(
                 route = "bird/edit?petId={petId}",
                 arguments = listOf(navArgument("petId") { type = NavType.StringType; nullable = true; defaultValue = null }),

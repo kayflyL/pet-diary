@@ -6,7 +6,9 @@ import com.petdiary.parrot.core.designsystem.BirdAccents
 import com.petdiary.parrot.core.model.SpeciesCatalog
 import com.petdiary.parrot.core.util.AgeFormatter
 import com.petdiary.parrot.data.DiaryRepository
+import com.petdiary.parrot.data.ExpenseRepository
 import com.petdiary.parrot.data.FoodRepository
+import com.petdiary.parrot.data.ReminderRepository
 import com.petdiary.parrot.data.PetRepository
 import com.petdiary.parrot.data.PlaceRepository
 import com.petdiary.parrot.data.WeightRepository
@@ -57,6 +59,8 @@ class TodayViewModel @Inject constructor(
     placeRepository: PlaceRepository,
     private val foodRepository: FoodRepository,
     private val diaryRepository: DiaryRepository,
+    private val reminderRepository: ReminderRepository,
+    private val expenseRepository: ExpenseRepository,
 ) : ViewModel() {
 
     init {
@@ -64,6 +68,17 @@ class TodayViewModel @Inject constructor(
             foodRepository.ensureBuiltinImported()
             placeRepository.ensureHomePlace()
         }
+    }
+
+    val dueReminders: StateFlow<List<com.petdiary.parrot.data.local.ReminderEntity>> = reminderRepository.observeDue()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun completeReminder(id: String) {
+        viewModelScope.launch { reminderRepository.completeOnce(id) }
+    }
+
+    fun addExpense(category: String, amount: Double, note: String?) {
+        viewModelScope.launch { expenseRepository.add(selectedBird.value?.id, category, amount, note) }
     }
 
     fun saveDiary(text: String, tags: List<String>, photoUris: List<android.net.Uri>) {

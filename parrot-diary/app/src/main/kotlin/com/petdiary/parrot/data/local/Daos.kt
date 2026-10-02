@@ -121,9 +121,15 @@ interface ReminderDao {
     @Query("SELECT * FROM reminders WHERE enabled = 1 ORDER BY nextAt")
     fun observeEnabled(): Flow<List<ReminderEntity>>
 
+    @Query("SELECT * FROM reminders ORDER BY nextAt")
+    fun observeAll(): Flow<List<ReminderEntity>>
+
     /** 记一次并顺延：完成本次 → nextAt += interval */
     @Query("UPDATE reminders SET nextAt = nextAt + intervalDays * 86400000, updatedAt = :now WHERE id = :id")
     suspend fun completeAndReschedule(id: String, now: Long)
+
+    @Query("DELETE FROM reminders WHERE id = :id")
+    suspend fun delete(id: String)
 }
 
 @Dao

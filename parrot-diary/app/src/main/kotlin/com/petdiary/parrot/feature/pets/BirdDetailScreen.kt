@@ -45,6 +45,7 @@ fun BirdDetailScreen(
     val pet by vm.bird.collectAsState()
     val latest by vm.latestWeight.collectAsState()
     val count by vm.recordCount.collectAsState()
+    val weights by vm.weights.collectAsState()
     val ui = detailUi(pet, latest, count, LocalDate.now().toEpochDay())
 
     Scaffold(
@@ -123,13 +124,22 @@ fun BirdDetailScreen(
                 ui.source?.let { InfoLine("来源", it) }
             }
 
-            InfoCard("体重与曲线") {
-                Text(
-                    if (ui.latestWeightText == null) "记录第一次体重后，这里会出现健康曲线（M3 即将到来）"
-                    else "体重曲线视图 M3 即将到来 · 当前最新 ${ui.latestWeightText}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Card(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+                Column(Modifier.padding(15.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("体重曲线", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            "近 ${weights.size} 次记录",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    WeightCurveCard(
+                        weights = weights,
+                        refRangeG = pet?.let { com.petdiary.parrot.core.model.SpeciesCatalog.refRangeOf(it.speciesId) },
+                    )
+                }
             }
             ui.notes?.let { InfoCard("备注") { Text(it, style = MaterialTheme.typography.bodyMedium) } }
             Spacer(Modifier.height(40.dp))

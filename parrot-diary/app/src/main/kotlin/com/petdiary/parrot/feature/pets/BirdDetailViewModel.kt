@@ -31,6 +31,9 @@ class BirdDetailViewModel @Inject constructor(
     val latestWeight: StateFlow<WeightLogEntity?> = weightRepository.observeLatest(petId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    val weights: StateFlow<List<WeightLogEntity>> = weightRepository.observeFor(petId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val recordCount: StateFlow<Int> = weightRepository.observeCount(petId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 }

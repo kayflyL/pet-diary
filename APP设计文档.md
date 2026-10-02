@@ -148,23 +148,47 @@ AppSetting(key, value)   // appearance 等
 
 ---
 
-## 11. 实施里程碑（v1.3 更新）
+## 11. 实施里程碑（v1.3 · 含完成状态与路线 A 调序）
 
-| 里程碑 | 内容 | 验收 |
-|---|---|---|
-| M1 | 数据层：Room 全表（含 ExpenseLog/EXIF）+食物库导入+仓库 | 单测通过 |
-| M2 | 档案+自动年龄+外观切换 | 建 3 只鸟、深浅切换 |
-| M3 | 体重+曲线（3 秒流程+品种区间+异常提示） | 录入 ≤3 秒 |
-| M4 | 喂食+食物库+饮食统计 | 偏好→记录→统计正确 |
-| M5 | 日记+拍照+照片墙+行迹地图 | 拍照带 GPS 上地图 |
-| M6 | 周期提醒（预设+记一次顺延）+记开销+花费统计 | 驱虫记一次自动顺延 90 天 |
-| M7 | 备份恢复+设置+整体打磨 | **备份往返测试通过** |
+| 里程碑 | 内容 | 验收 | 状态 |
+|---|---|---|---|
+| M1 | 数据层：Room 全表（含 ExpenseLog/EXIF/Place）+食物库导入+仓库 | 单测通过 | ✅ 完成（e2e6dd1） |
+| M2 | 档案+自动年龄+外观切换 | 建 3 只鸟、深浅切换 | ✅ 完成（148b641） |
+| M3 | **视觉骨架**：今天页（英雄卡+周条热力+3 秒记体重）+ 回忆影院骨架 + 四 Tab + 我的页 | 模拟器全流程 | ✅ 完成（5d717fe） |
+| M3.5 | 体重曲线 Canvas（品种区间色带+异常趋势提示） | 曲线随录入实时更新 | ⏭ 下一步 |
+| M4 | 喂食+食物库+饮食统计 | 偏好→记录→统计正确 | |
+| M5 | 日记+拍照+照片墙+行迹地图（高德） | 拍照带 GPS 上地图 | |
+| M6 | 周期提醒（预设+记一次顺延）+记开销+花费统计 | 驱虫记一次自动顺延 90 天 | |
+| M7 | 备份恢复+设置+整体视觉打磨（图标/间距/动效对齐原型） | **备份往返测试通过** | |
+| **M8** | **虚拟宠物屋（Rive 路线，见 §13）** | 房间+idle 动画+3 个记录联动 | 预研定案 |
+
+> 路线 A 说明：应用户要求改为"视觉骨架先行"——M3 已把首页/回忆骨架立起，后续里程碑在此骨架上填功能与打磨。
 
 ---
 
 ## 12. 待确认（不阻塞）
 
 养几只什么品种 / 有无育雏需求 / 正式名。
+
+---
+
+## 13. 虚拟宠物屋（M8）· 技术预研与定案（2026-10-02）
+
+**概念**：每只鸟一间 2D 虚拟房间，鸟在其中"生活"，**行为由真实记录驱动**——今日已称重→开心动画；3 天未记录→蔫蔫的；记喂食→进食反应；到期提醒→头顶气泡"该称重啦"；性格标签（已存库）影响 idle 行为（话痨=冒音符，高冷=偶尔背对你）。
+
+**技术定案：Rive 路线**（备选 Lottie；手写 Canvas 方案降级为无美术资源时的兜底）
+
+调研结论（2026-10-02 联网核证）：开源 Tamagotchi 类 Compose demo（[Totigotchi](https://github.com/caroltaus/Totigotchi)、[Tamagochi-OSG](https://github.com/Tech-aficionado/Tamagochi---Open-Source-Game)、[pimagotchi](https://github.com/Studio-Sunnyfield/pimagotchi) 等）普遍简陋——**问题在个人项目的美术与打磨，不在 Compose**。商业级 2D 角色的标准做法是"美术工具做角色+状态机，App 只播放与喂数据"：
+
+- **Rive**：角色+状态机在设计稿内完成（待机/开心/饿/睡 + 点击触发），App 端 [rive-android 运行时](https://rive.app/docs/runtimes/android/state-machines)加载 .riv 文件；Compose 集成有[现成示例](https://github.com/srcemre/interactive-login-screen-with-rive-and-jetpack-compose)；生产背书：[Slice 银行工程博客](https://engineering.slice.bank.in/bringing-interfaces-to-life-with-rive-real-time-animations-at-slice-cd80d2742176)；官方可交互示例见 [rive.app/examples](https://rive.app/examples)
+- **Lottie**：[Duolingo 同款路线](https://blog.duolingo.com/streak-milestone-design-animation)（Duo 由真实学习记录驱动哭/笑/庆祝），[LottieFiles](https://lottiefiles.com) 现成角色生态最大，门槛更低但交互弱于 Rive
+
+**关键市场佐证**：Duolingo 与 Finch（自我照顾宠物鸟 App）= "虚拟宠物由真实行为驱动"的商业级成功，与本项目概念 100% 同构，且我们的数据（称重/喂食/陪伴）比打卡更具体。
+
+**范围锁死（第一版）**：静态房间 + 鸟 idle 动画 + 3 个记录联动（称重/喂食/提醒气泡）；装饰与换装二期。
+**入口**：首页英雄卡或鸟详情进入全屏房间（不加第 5 个底部 Tab）。
+**成本结构**：代码少量（数天）；主要成本=角色美术——先用 Rive Marketplace / LottieFiles 现成角色做技术验证，满意再投资定制。
+**架构影响**：零改动——Compose 骨架（页面/导航/数据）全部保留，仅"宠物屋画布"换为 RiveView/Lottie 组件 + 记录数据作状态机输入。
 
 ## 附录：内置食物清单（36 种）
 

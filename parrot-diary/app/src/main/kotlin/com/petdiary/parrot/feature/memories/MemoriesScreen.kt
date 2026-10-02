@@ -1,6 +1,5 @@
 package com.petdiary.parrot.feature.memories
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,8 +21,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -33,27 +30,30 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.petdiary.parrot.core.designsystem.BirdAccents
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.time.Instant
 import java.time.ZoneId
+import java.util.Locale
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalContext
 
-/** 回忆 · StoryTeller 纸面（APP设计文档.md §7）：照片即界面 */
+/** 回忆 · 纸面（APP设计文档.md §7，StoryTeller 结构）· 数据来自 MemoriesViewModel */
 @Composable
 fun MemoriesScreen(vm: MemoriesViewModel = hiltViewModel()) {
     val ui by vm.ui.collectAsState()
@@ -123,6 +123,14 @@ private fun StoryCard(story: StoryUi) {
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
                 )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(listOf(Color(0xFFBFE3CE), Color(0xFF5FA97E))),
+                        ),
+                )
             }
             Column(
                 Modifier
@@ -131,7 +139,15 @@ private fun StoryCard(story: StoryUi) {
                     .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xAA10291A))))
                     .padding(12.dp),
             ) {
-                Text(story.titleText(), fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                Text(
+                    when {
+                        story.texts.isNotEmpty() -> story.texts.first().take(16)
+                        else -> story.date.let { "${it.monthValue} 月 ${it.dayOfMonth} 日" }
+                    },
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                )
                 Text(
                     "${story.entryCount} 条日记 · ${story.photoCount} 张照片",
                     fontSize = 11.sp,
@@ -150,15 +166,6 @@ private fun StoryCard(story: StoryUi) {
         }
     }
 }
-
-private fun StoryUi.titleText(): String = when {
-    dateText.contains("10 月 1") -> "外婆家过国庆"
-    dateText.contains("4 月") -> "人民公园半日游"
-    else -> "这一天"
-}
-
-private val StoryUi.dateText: String
-    get() = "${date.monthValue} 月 ${date.dayOfMonth} 日"
 
 @Composable
 private fun StoryList(stories: List<StoryUi>) {
@@ -212,7 +219,7 @@ private fun PhotoWall(photos: List<PhotoUi>) {
     }
 }
 
-/** 行迹地图：osmdroid 真地图 + 绿色足迹 + 轨迹线 */
+/** 行迹地图：osmdroid 真地图 + 轨迹线 + 照片足迹 */
 @Composable
 private fun TrailMap(geotagged: List<PhotoUi>) {
     val points = geotagged.mapNotNull { p ->
@@ -229,28 +236,44 @@ private fun TrailMap(geotagged: List<PhotoUi>) {
         )
         return
     }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val mapView = remember {
+        MapView(ctx).apply {
+            setTileSource(TileSourceFactory.MAPNIK)
+            setMultiTouchControls(true)
+        }
+    }
     AndroidView(
         modifier = Modifier
             .fillMaxWidth()
             .height(250.dp),
         factory = { c ->
-            MapView(c).apply {
-                setTileSource(TileSourceFactory.MAPNIK)
-                setMultiTouchControls(true)
+            mapView.apply {
+                controller.setZoom(13.0)
                 val centerLat = points.map { it.first }.average()
                 val centerLng = points.map { it.second }.average()
-                controller.setZoom(12.0)
                 controller.setCenter(GeoPoint(centerLat, centerLng))
-                points.forEach { (lat, lng, _) ->
-                    overlays.add(
-                        Marker(this).apply {
-                            position = GeoPoint(lat, lng)
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            title = "拍摄地点"
-                        },
-                    )
-                }
             }
+        },
+        update = { map ->
+            map.overlays.clear()
+            val line = org.osmdroid.views.overlay.Polyline(map).apply {
+                setPoints(points.map { GeoPoint(it.first, it.second) })
+                outlinePaint.color = GreenInk.toArgb()
+                outlinePaint.strokeWidth = 9f
+            }
+            map.overlays.add(line)
+            points.forEach { (lat, lng, p) ->
+                map.overlays.add(
+                    Marker(map).apply {
+                        position = GeoPoint(lat, lng)
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                        title = p.placeName ?: "拍摄地点"
+                        subDescription = SimpleDateFormat("M 月 d 日", Locale.CHINESE).format(Date(p.date.toEpochDay() * 86400000L))
+                    },
+                )
+            }
+            map.invalidate()
         },
     )
     Spacer(Modifier.height(10.dp))
@@ -258,20 +281,35 @@ private fun TrailMap(geotagged: List<PhotoUi>) {
         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(40.dp)
                     .background(GreenInkSoft, RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("📷", fontSize = 14.sp)
+                AsyncImage(
+                    model = java.io.File(p.path),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
             }
             Column(Modifier.padding(start = 10.dp)) {
-                Text("%.4f, %.4f".format(lat, lng), fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
                 Text(
-                    p.date.let { "${it.year}-${it.monthValue}-${it.dayOfMonth}" },
+                    p.placeName ?: "%.4f, %.4f".format(lat, lng),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    p.date.let { "${it.year} 年 ${it.monthValue} 月 ${it.dayOfMonth} 日" },
                     fontSize = 10.5.sp,
                     color = SubInk,
                 )
             }
         }
     }
+    Spacer(Modifier.height(8.dp))
+    Text(
+        "📍 位置来自照片 EXIF，仅存本地 · 地图底图国内加载不稳定，正式版将接入高德",
+        fontSize = 10.5.sp,
+        color = SubInk,
+    )
 }

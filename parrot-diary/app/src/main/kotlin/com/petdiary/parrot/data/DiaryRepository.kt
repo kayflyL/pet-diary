@@ -6,6 +6,7 @@ import androidx.exifinterface.media.ExifInterface
 import com.petdiary.parrot.data.local.DiaryDao
 import com.petdiary.parrot.data.local.DiaryEntryEntity
 import com.petdiary.parrot.data.local.DiaryMediaEntity
+import com.petdiary.parrot.data.local.GeoMediaRow
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.text.SimpleDateFormat
@@ -30,6 +31,7 @@ class DiaryRepository @Inject constructor(
     fun observeAllEntries(): Flow<List<DiaryEntryEntity>> = dao.observeAll()
     fun observeAllMedia(): Flow<List<DiaryMediaEntity>> = dao.observeAllMedia()
     fun observeGeotagged(): Flow<List<DiaryMediaEntity>> = dao.observeGeotagged()
+    fun observeGeotaggedNamed(): Flow<List<GeoMediaRow>> = dao.observeGeoNamed()
 
     /** 写日记：文本 + 标签 + 可选多图（自动复制并读取 EXIF 位置） */
     suspend fun createEntry(

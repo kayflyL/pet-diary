@@ -102,6 +102,16 @@ interface DiaryDao {
     /** 行迹：有 GPS 的媒体 */
     @Query("SELECT * FROM diary_media WHERE lat IS NOT NULL AND lng IS NOT NULL")
     fun observeGeotagged(): Flow<List<DiaryMediaEntity>>
+
+    /** 行迹：带 GPS 的媒体 + 地点名（LEFT JOIN places） */
+    @Query(
+        "SELECT m.id AS id, m.path AS path, m.lat AS lat, m.lng AS lng, p.name AS placeName, " +
+            "COALESCE(m.takenAt, e.happenedAt) AS takenAt " +
+            "FROM diary_media m LEFT JOIN places p ON p.id = m.placeId " +
+            "LEFT JOIN diary_entries e ON e.id = m.entryId " +
+            "WHERE m.lat IS NOT NULL AND m.lng IS NOT NULL ORDER BY takenAt",
+    )
+    fun observeGeoNamed(): Flow<List<GeoMediaRow>>
 }
 
 @Dao
@@ -148,6 +158,16 @@ interface ExpenseDao {
 }
 
 data class CategoryTotalRow(val category: String, val cnt: Double)
+
+/** 行迹查询行：媒体 + 关联地点名 */
+data class GeoMediaRow(
+    val id: String,
+    val path: String,
+    val lat: Double,
+    val lng: Double,
+    val placeName: String?,
+    val takenAt: Long?,
+)
 
 @Dao
 interface FoodDao {

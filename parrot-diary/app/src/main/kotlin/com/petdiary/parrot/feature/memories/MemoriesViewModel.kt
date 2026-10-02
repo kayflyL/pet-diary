@@ -31,6 +31,7 @@ data class PhotoUi(
     val date: LocalDate,
     val lat: Double?,
     val lng: Double?,
+    val placeName: String? = null,
 )
 
 data class MemoriesUi(
@@ -51,7 +52,8 @@ class MemoriesViewModel @Inject constructor(
         diaryRepository.observeAllEntries(),
         diaryRepository.observeAllMedia(),
         petRepository.observeActive(),
-    ) { entries, media, pets ->
+        diaryRepository.observeGeotaggedNamed(),
+    ) { entries, media, pets, geo ->
         val nameById = pets.associate { it.id to it.name }
         val mediaByEntry = media.groupBy { it.entryId }
 
@@ -71,6 +73,7 @@ class MemoriesViewModel @Inject constructor(
                 )
             }
 
+        val geoById = geo.associateBy { it.id }
         val photos = media
             .sortedByDescending { it.createdAt }
             .map { m ->
@@ -82,6 +85,7 @@ class MemoriesViewModel @Inject constructor(
                     date = Instant.ofEpochMilli(m.createdAt).atZone(zone).toLocalDate(),
                     lat = m.lat,
                     lng = m.lng,
+                    placeName = geoById[m.id]?.placeName,
                 )
             }
 

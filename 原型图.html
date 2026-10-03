@@ -259,8 +259,18 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
 .cbub:hover{transform:translate(-50%,-50%) scale(1.06)}
 .cbub.g{background:#2F8F5B}.cbub.b{background:#4A7FB5}
 /* 照片地图（2026-10-03 定案）：照片圆钉 + 计数聚合 + 点击看大图 */
-.pcl{position:absolute;transform:translate(-50%,-50%);width:54px;height:54px;border-radius:50%;border:3px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-size:25px;cursor:pointer;transition:transform .15s}
-.pcl:hover{transform:translate(-50%,-50%) scale(1.07)}
+.world{position:absolute;inset:0;transform-origin:center center;transition:transform .25s ease}
+.world.dragging{transition:none}
+.pcl{position:absolute;transform:translate(-50%,-50%) scale(var(--iz,1));width:54px;height:54px;border-radius:50%;border:3px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-size:25px;cursor:pointer;transition:transform .15s}
+.pcl:hover{transform:translate(-50%,-50%) scale(calc(var(--iz,1)*1.07))}
+.zdot{position:absolute;width:26px;height:26px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.25);display:none;align-items:center;justify-content:center;font-size:13px;cursor:pointer;transform:translate(-50%,-50%) scale(var(--iz,1))}
+.zbtns{position:absolute;left:8px;bottom:8px;display:flex;flex-direction:column;gap:6px;z-index:6}
+.zbtn{width:26px;height:26px;border-radius:8px;background:rgba(16,19,18,.5);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;user-select:none}
+.zbtn:hover{background:rgba(16,19,18,.8)}
+#pmap.zoomed{cursor:grab}
+#pmap.deep .zdot{display:flex}
+#pmap.deep .pcl{display:none}
+#pmap.deep .ptag{display:none!important}
 .pcl .n{position:absolute;top:-7px;right:-7px;min-width:22px;height:22px;border-radius:999px;background:#22312A;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid #fff;padding:0 4px;box-sizing:border-box}
 .pv{position:fixed;inset:0;z-index:99;display:none;background:#0F1210}
 .pv.show{display:block}
@@ -457,19 +467,31 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
   </div>
 
   <div id="m-map" class="hidden">
-    <div class="papermap" onclick="qpClose()">
+    <div class="papermap" id="pmap">
+      <div class="world" id="world">
       <div class="park"></div><div class="water"></div>
-      <span class="fs-back" onclick="event.stopPropagation();mapFs(false)">←</span>
-      <span class="fs-stats">📍 9 张有位置信息 · 3 个地方</span>
       <span class="pcl" style="left:76%;top:26%;background:linear-gradient(140deg,#CBE5D6,#5FA97E)" onclick="event.stopPropagation();qpOpen('park',this)">🌳<span class="n">12</span></span>
       <span class="pcl" style="left:50%;top:56%;background:linear-gradient(140deg,#DCEEE2,#9CCDB0)" onclick="event.stopPropagation();qpOpen('home',this)">🦜<span class="n">86</span></span>
       <span class="pcl" style="left:22%;top:76%;background:linear-gradient(140deg,#FFE9BE,#F0C25F)" onclick="event.stopPropagation();qpOpen('grandma',this)">🏡<span class="n">5</span></span>
       <span class="pcl" style="left:30%;top:33%;width:34px;height:34px;font-size:17px;border-width:2px;background:linear-gradient(140deg,#D4E5F7,#8FB3D9)" onclick="event.stopPropagation();qpOpen('vet',this)">🏥</span>
+      <span class="zdot" style="left:70%;top:20%;background:linear-gradient(140deg,#CBE5D6,#5FA97E)" onclick="event.stopPropagation();qpOpen('park',this,0)">🌳</span>
+      <span class="zdot" style="left:81%;top:29%;background:linear-gradient(140deg,#D4E5F7,#8FB3D9)" onclick="event.stopPropagation();qpOpen('park',this,1)">🎵</span>
+      <span class="zdot" style="left:73%;top:34%;background:linear-gradient(140deg,#F6D6E0,#EFB3C8)" onclick="event.stopPropagation();qpOpen('park',this,2)">🌸</span>
+      <span class="zdot" style="left:44%;top:50%;background:linear-gradient(140deg,#CBE5D6,#5FA97E)" onclick="event.stopPropagation();qpOpen('home',this,0)">🦜</span>
+      <span class="zdot" style="left:56%;top:54%;background:linear-gradient(140deg,#DCEEE2,#9CCDB0)" onclick="event.stopPropagation();qpOpen('home',this,1)">🌿</span>
+      <span class="zdot" style="left:48%;top:63%;background:linear-gradient(140deg,#E3F0E6,#BFDCC9)" onclick="event.stopPropagation();qpOpen('home',this,2)">☀️</span>
+      <span class="zdot" style="left:16%;top:72%;background:linear-gradient(140deg,#FFE9BE,#F0C25F)" onclick="event.stopPropagation();qpOpen('grandma',this,0)">🏡</span>
+      <span class="zdot" style="left:27%;top:81%;background:linear-gradient(140deg,#FFE9BE,#F0C25F)" onclick="event.stopPropagation();qpOpen('grandma',this,1)">🥧</span>
+      <span class="zdot" style="left:30%;top:33%;background:linear-gradient(140deg,#D4E5F7,#8FB3D9)" onclick="event.stopPropagation();qpOpen('vet',this,0)">🏥</span>
       <span class="ptag" style="left:76%;top:38%">人民公园</span>
       <span class="ptag" style="left:50%;top:68%">家</span>
       <span class="ptag" style="left:22%;top:88%">外婆家</span>
       <span class="ptag" style="left:30%;top:45%">安安异宠医院</span>
-      <span class="zoomnote">缩小地图 · 相近照片自动聚合成气泡 · 点气泡弹快览卡</span>
+      </div>
+      <span class="fs-back" onclick="event.stopPropagation();mapFs(false)">←</span>
+      <span class="fs-stats">📍 9 张有位置信息 · 3 个地方</span>
+      <div class="zbtns"><span class="zbtn" onclick="event.stopPropagation();mzStep(1)">＋</span><span class="zbtn" onclick="event.stopPropagation();mzStep(-1)">－</span></div>
+      <span class="zoomnote">滚轮或＋－缩放 · 放大后聚合散开成单张照片 · 拖拽平移</span>
       <span class="fs-btn" onclick="event.stopPropagation();mapFs(true)" title="全屏地图">⛶</span>
       <div class="qp" id="qp" onclick="event.stopPropagation()">
         <span class="qp-x" onclick="event.stopPropagation();qpClose()">✕</span>
@@ -814,7 +836,7 @@ document.getElementById('pv-gps').textContent='📍 '+pl.gps;
 function pvMove(d){pvI=Math.max(0,Math.min(PVDATA[pvK].photos.length-1,pvI+d));pvRender();}
 function pvClose(){document.getElementById('pv').classList.remove('show');}
 let qpK='home',qpI=0;
-function qpOpen(k,el){qpK=k;qpI=0;const qp=document.getElementById('qp');const pm=document.querySelector('#m-map .papermap');
+function qpOpen(k,el,i){qpK=k;qpI=i||0;const qp=document.getElementById('qp');const pm=document.querySelector('#m-map .papermap');
  const pr=pm.getBoundingClientRect(),er=el.getBoundingClientRect();
  const cx=er.left-pr.left+er.width/2, cy=er.top-pr.top;
  qp.classList.add('show');
@@ -834,6 +856,33 @@ function fsSlide(v){v=+v;const show={vet:v>=1,grandma:v>=2,park:v>=4,home:v>=7};
  document.querySelectorAll('#m-map .pcl').forEach(el=>{const m=el.getAttribute('onclick').match(/qpOpen\('(\w+)'/);if(m)el.style.display=show[m[1]]?'flex':'none';});
  document.getElementById('fs-label').textContent=v>=9?'📅 全部时间 · 9 张':v>=4?'📅 至 2026-09 · 6 张':v>=2?'📅 至 2026-08 · 3 张':'📅 至 2025-12 · 1 张';
  if(qpK&&!show[qpK])qpClose();}
+let mzI=0,mzTx=0,mzTy=0,mzDrag=null,mzMoved=false;
+const MZ=[1,2,3.2];
+function mzApply(){const pm=document.getElementById('pmap');const z=MZ[mzI];
+ pm.style.setProperty('--iz',(1/z).toFixed(3));
+ pm.classList.toggle('zoomed',z>1);
+ pm.classList.toggle('deep',mzI>=1);
+ document.getElementById('world').style.transform='translate('+mzTx+'px,'+mzTy+'px) scale('+z+')';
+ qpClose();}
+function mzClamp(){const pm=document.getElementById('pmap');const z=MZ[mzI];
+ const mx=(z-1)*pm.clientWidth/2,my=(z-1)*pm.clientHeight/2;
+ mzTx=Math.min(mx,Math.max(-mx,mzTx));mzTy=Math.min(my,Math.max(-my,mzTy));}
+function mzStep(dir,cx,cy){const ni=Math.min(MZ.length-1,Math.max(0,mzI+dir));if(ni===mzI)return;
+ const pm=document.getElementById('pmap');const r=pm.getBoundingClientRect();const z0=MZ[mzI],z1=MZ[ni];
+ const px=(cx==null)?r.width/2:(cx-r.left),py=(cy==null)?r.height/2:(cy-r.top);
+ const ex=px-r.width/2-mzTx,ey=py-r.height/2-mzTy;
+ mzTx+=(z0-z1)*(ex/z0);mzTy+=(z0-z1)*(ey/z0);
+ mzI=ni;mzClamp();mzApply();}
+(function(){const pm=document.getElementById('pmap');
+ pm.addEventListener('wheel',e=>{e.preventDefault();mzStep(e.deltaY<0?1:-1,e.clientX,e.clientY);},{passive:false});
+ pm.addEventListener('mousedown',e=>{if(MZ[mzI]>1){mzDrag={x:e.clientX,y:e.clientY};mzMoved=false;e.stopPropagation();}});
+ window.addEventListener('mousemove',e=>{if(mzDrag){const dx=e.clientX-mzDrag.x,dy=e.clientY-mzDrag.y;
+  if(Math.abs(dx)+Math.abs(dy)>4)mzMoved=true;
+  mzTx+=dx;mzTy+=dy;mzDrag={x:e.clientX,y:e.clientY};
+  document.getElementById('world').classList.add('dragging');mzClamp();mzApply();}});
+ window.addEventListener('mouseup',()=>{if(mzDrag){mzDrag=null;mzMoved=false;document.getElementById('world').classList.remove('dragging');}});
+ pm.addEventListener('click',e=>{if(mzMoved){e.stopPropagation();mzMoved=false;return;}qpClose();},true);
+})();
 let pvZ=1,pvTx=0,pvTy=0,pvDown=false,pvSX=0,pvSY=0;
 function pvToggleZoom(e){const img=document.getElementById('pv-img');
  pvZ=pvZ>1?1:2.1;

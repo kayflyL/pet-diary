@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.core.view.doOnLayout
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -84,18 +85,18 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import kotlin.math.roundToInt
 
-/** 地点大字列表的轮换色（设计文档 §7：绿/蓝/琥珀交替） */
-private val placeColors = listOf(Color(0xFF2F8F5B), Color(0xFF4A7FB5), Color(0xFFB07A16))
-
 /** 巨型文字 Tab 未选中态的浅灰（原型 .mt 色） */
 private val TabIdle = Color(0xFFC7C9CC)
 
 /** 回忆 · 纸面（APP设计文档.md §7，StoryTeller 结构）· 数据来自 MemoriesViewModel */
 @Composable
-fun MemoriesScreen(onOpenPlace: (String) -> Unit = {}, vm: MemoriesViewModel = hiltViewModel()) {
+fun MemoriesScreen(
+    onOpenPlace: (String) -> Unit = {},
+    onOpenPlaces: () -> Unit = {},
+    vm: MemoriesViewModel = hiltViewModel(),
+) {
     val ui by vm.ui.collectAsState()
     var seg by remember { mutableIntStateOf(0) }
-    var mapFs by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     var viewer by remember { mutableStateOf<ViewerState?>(null) }
     val placeCount = ui.geotagged
@@ -103,16 +104,15 @@ fun MemoriesScreen(onOpenPlace: (String) -> Unit = {}, vm: MemoriesViewModel = h
         .size
 
     PaperTheme {
-        Box(Modifier.fillMaxSize()) {
-            Scaffold { padding ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .background(PaperBg)
-                        .verticalScroll(scrollState)
-                        .padding(18.dp),
-                ) {
+        Scaffold { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .background(PaperBg),
+            ) {
+                // 头部：MEMORIES 帽 + 巨型文字 Tab + 统计行（StoryTeller DNA ①）
+                Column(Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
                     Text(
                         "MEMORIES",
                         fontSize = 10.5.sp,
@@ -120,7 +120,6 @@ fun MemoriesScreen(onOpenPlace: (String) -> Unit = {}, vm: MemoriesViewModel = h
                         color = GreenInk,
                         fontWeight = FontWeight.Bold,
                     )
-                    // 巨型文字 Tab：大号文字即页签（StoryTeller DNA ①）
                     Row(Modifier.padding(top = 4.dp)) {
                         listOf("故事", "地图", "照片").forEachIndexed { i, label ->
                             Text(
@@ -128,7 +127,7 @@ fun MemoriesScreen(onOpenPlace: (String) -> Unit = {}, vm: MemoriesViewModel = h
                                 fontSize = 27.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 letterSpacing = (-0.5).sp,
-                                color = if (seg == i && !mapFs) PaperInk else if (mapFs) TabIdle else TabIdle,
+                                color = if (seg == i) PaperInk else TabIdle,
                                 modifier = Modifier
                                     .padding(end = 13.dp)
                                     .clickable { seg = i },
@@ -141,39 +140,39 @@ fun MemoriesScreen(onOpenPlace: (String) -> Unit = {}, vm: MemoriesViewModel = h
                         color = SubInk,
                         modifier = Modifier.padding(top = 4.dp),
                     )
-
-                    QuoteBlock()
-
-                    // 分段切换暂不做过渡动画：AnimatedContent 会让互操作 MapView 以 0 高
-                    // 参与 Compose 布局（View 实际仍按原尺寸绘制，压住列表），待互操作安全方案
-                    when (seg) {
-                        0 -> StoryWall(ui.stories, scrollState)
-                        1 -> if (!mapFs) {
-                            PhotoMap(
-                                geotagged = ui.geotagged,
-                                fullscreen = false,
-                                onOpenViewer = { viewer = it },
-                                onOpenPlace = onOpenPlace,
-                                onToggleFullscreen = { mapFs = true },
-                            )
-                        }
-                        else -> PhotoWall(ui.photos) { viewer = it }
+                }
+                when (seg) {
+                    0 -> Column(
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(scrollState)
+                            .padding(horizontal = 18.dp),
+                    ) {
+                        QuoteBlock()
+                        StoryWall(ui.stories, scrollState)
+                        Spacer(Modifier.height(20.dp))
+                    }
+                    1 -> PhotoMap(
+                        geotagged = ui.geotagged,
+                        modifier = Modifier.weight(1f),
+                        onOpenViewer = { viewer = it },
+                        onOpenPlace = onOpenPlace,
+                        onOpenPlaces = onOpenPlaces,
+                    )
+                    else -> Column(
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(scrollState)
+                            .padding(horizontal = 18.dp),
+                    ) {
+                        PhotoWall(ui.photos) { viewer = it }
+                        Spacer(Modifier.height(20.dp))
                     }
                 }
             }
-            // 全屏地图（原型 ⛶）：覆盖整个内容区含底部导航
-            if (mapFs) {
-                PhotoMap(
-                    geotagged = ui.geotagged,
-                    fullscreen = true,
-                    onOpenViewer = { viewer = it },
-                    onOpenPlace = onOpenPlace,
-                    onToggleFullscreen = { mapFs = false },
-                )
-            }
-            viewer?.let { state ->
-                PhotoViewer(state = state, onDismiss = { viewer = null })
-            }
+        }
+        viewer?.let { state ->
+            PhotoViewer(state = state, onDismiss = { viewer = null })
         }
     }
 }
@@ -409,24 +408,7 @@ private data class GeoPhoto(val lat: Double, val lng: Double, val photo: PhotoUi
 /** 地点归组键：有名用名（可手动归并），无名按坐标就近聚合（约百米粒度） */
 private fun placeKeyOf(g: GeoPhoto): String = g.photo.placeName ?: "%.3f,%.3f".format(g.lat, g.lng)
 
-/** 按地点聚合的列表行（设计文档 §7：大字地点列表，无卡片框）；key=归组键，named=有地名可进详情 */
-private data class PlaceGroup(val key: String, val name: String, val cover: String, val photos: Int, val days: Int)
-
-private fun groupPlaces(points: List<GeoPhoto>): List<PlaceGroup> =
-    points
-        .groupBy { placeKeyOf(it) }
-        .map { (key, list) ->
-            PlaceGroup(
-                key = key,
-                name = list.first().photo.placeName ?: "%.4f, %.4f".format(list.first().lat, list.first().lng),
-                cover = list.first().photo.path,
-                photos = list.size,
-                days = list.map { it.photo.date }.distinct().size,
-            )
-        }
-        .sortedByDescending { it.photos }
-
-/** 照片裁圆 + 白描边 → 圆形照片钉图标；label 非空时在圆下画地名小签（全屏模式） */
+/** 照片裁圆 + 白描边 → 圆形照片钉图标；label 非空时在圆下画地名小签 */
 private fun circlePhotoDrawable(ctx: Context, path: String, sizeDp: Float, label: String? = null): Drawable? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(path, bounds)
@@ -647,16 +629,16 @@ internal fun PhotoViewer(state: ViewerState, onDismiss: () -> Unit) {
 private data class QuickView(val photos: List<PhotoUi>, val index: Int)
 
 /**
- * 照片地图（原型 v3.4 对齐）：高德底图 + 照片钉 + 缩放聚合分散 + 地图内快览浮层
- * + 时光滑轨（全屏）+ ⛶ 全屏模式 + fitBounds 自适应。
+ * 照片地图（原型 v3.6 对齐）：点「地图」页签直接看到铺满的地图。
+ * 密度全部交给缩放吸收（StoryTeller 哲学）：气泡只是浏览的门，不堆信息。
  */
 @Composable
 private fun PhotoMap(
     geotagged: List<PhotoUi>,
-    fullscreen: Boolean,
+    modifier: Modifier = Modifier,
     onOpenViewer: (ViewerState) -> Unit,
     onOpenPlace: (String) -> Unit,
-    onToggleFullscreen: () -> Unit,
+    onOpenPlaces: () -> Unit,
 ) {
     val all = geotagged.mapNotNull { p ->
         val lat = p.lat ?: return@mapNotNull null
@@ -711,37 +693,37 @@ private fun PhotoMap(
     }
     // 读一下 tick：缩放发生时触发重组，让下面的 update 重新聚类
     val tick = clusterTick
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .then(if (fullscreen) Modifier.fillMaxSize() else Modifier.height(300.dp)),
-    ) {
-        // 地图区：快览浮层/缩放钮/提示签都"长在地图上"（对齐原型）
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .then(if (fullscreen) Modifier.weight(1f) else Modifier.height(300.dp)),
-        ) {
+    Column(modifier.fillMaxWidth()) {
+        // 地图区：浮层都"长在地图上"（对齐原型 v3.6）
+        Box(Modifier.fillMaxWidth().weight(1f)) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { c ->
                     mapView.apply {
-                        // fitBounds：按可见照片范围自适应缩放（对齐 photo_gallery）
+                        // fitBounds：按可见照片范围自适应缩放（对齐 photo_gallery）。
+                        // 必须等布局完成后再算——View 宽高为 0 时会算出极端缩放
                         val bb = BoundingBox.fromGeoPoints(points.map { GeoPoint(it.lat, it.lng) })
                         controller.setCenter(GeoPoint((bb.latSouth + bb.latNorth) / 2, (bb.lonWest + bb.lonEast) / 2))
-                        post { zoomToBoundingBox(bb.increaseByScale(1.25f), false) }
+                        doOnLayout {
+                            post {
+                                zoomToBoundingBox(bb.increaseByScale(1.3f), false)
+                                clusterTick++ // 程序化 fitBounds 不触发重组，手动重算覆盖层
+                            }
+                        }
                     }
                 },
                 update = { map ->
                     map.overlays.clear()
                     val density = ctx.resources.displayMetrics.density
                     val nodes = clusterNodes(map, points, 46f * density)
+                    // 捕获 tick：clusterTick 变化时生成新 lambda 实例，AndroidView 才会重跑 update
+                    android.util.Log.d("PhotoMap", "recluster tick=" + tick + " zoom=" + map.zoomLevelDouble + " nodes=" + nodes.size + " points=" + points.size)
                     nodes.forEach { node ->
                         map.overlays.add(
                             Marker(map).apply {
                                 position = GeoPoint(node.lat, node.lng)
-                                // 全屏模式给圆点画地名签；混合了多个地点的聚合不标单一地名
-                                val label = if (fullscreen && node.photos.map { placeKeyOf(it) }.distinct().size == 1) {
+                                // 地名签：只有单一地点的节点才标（混合聚合不标，避免误导）
+                                val label = if (node.photos.map { placeKeyOf(it) }.distinct().size == 1) {
                                     node.photos[0].photo.placeName
                                 } else null
                                 val labDp = if (label != null) 18f else 0f
@@ -770,6 +752,24 @@ private fun PhotoMap(
                     map.invalidate()
                 },
             )
+            // 全部地点入口（原型 .places-chip 左上）
+            MapChip(
+                "全部地点 ›",
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp),
+            ) { onOpenPlaces() }
+            // 统计浮牌（原型 .fs-stats 右上）
+            Text(
+                "📍 ${points.size} 张有位置信息 · $placeCount 个地方",
+                fontSize = 10.5.sp,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp)
+                    .background(Color(0xB3101914), RoundedCornerShape(999.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+            )
             // ＋－ 缩放按钮（原型 .zbtns 左下）
             Column(
                 Modifier
@@ -777,8 +777,15 @@ private fun PhotoMap(
                     .padding(10.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                MapChip("＋") { mapView.controller.zoomIn() }
-                MapChip("－") { mapView.controller.zoomOut() }
+                MapChip("＋") {
+                    android.util.Log.d("PhotoMap", "plus clicked")
+                    clusterTick++
+                    mapView.controller.zoomIn()
+                }
+                MapChip("－") {
+                    clusterTick++
+                    mapView.controller.zoomOut()
+                }
             }
             // 提示浮签（原型 .zoomnote 右下）
             Text(
@@ -790,24 +797,6 @@ private fun PhotoMap(
                     .background(Color(0xFFE7EEE7), RoundedCornerShape(8.dp))
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             )
-            if (fullscreen) {
-                // ← 退出全屏（原型 .fs-back）
-                MapChip("←", Modifier.align(Alignment.TopStart).padding(12.dp)) { onToggleFullscreen() }
-                // 统计浮牌（原型 .fs-stats）
-                Text(
-                    "📍 ${points.size} 张有位置信息 · $placeCount 个地方",
-                    fontSize = 10.5.sp,
-                    color = Color.White,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(12.dp)
-                        .background(Color(0xB3101914), RoundedCornerShape(999.dp))
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                )
-            } else {
-                // ⛶ 进入全屏（原型 .fs-btn）
-                MapChip("⛶", Modifier.align(Alignment.TopEnd).padding(10.dp)) { onToggleFullscreen() }
-            }
             // 快览浮层（两段式第一段：预览 + 左右切换，点预览图进全屏）
             quick?.let { q ->
                 Column(
@@ -869,70 +858,36 @@ private fun PhotoMap(
                 }
             }
         }
-        // 时光滑轨面板（原型 .fs-slider：全屏时位于地图下方，不与地图重叠）
-        if (fullscreen) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xD9101312))
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-            ) {
-                Text(
-                    if (shown >= ordered.size) "📅 全部时间 · ${ordered.size} 张" else "📅 至 ${points.last().photo.date.monthValue} 月 · $shown 张",
-                    fontSize = 11.sp,
-                    color = Color(0xFFA8B3AC),
-                    modifier = Modifier.padding(bottom = 2.dp),
-                )
-                Slider(
-                    value = shown.toFloat(),
-                    onValueChange = { shown = it.toInt().coerceIn(1, ordered.size) },
-                    valueRange = 1f..ordered.size.toFloat(),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("${ordered.first().photo.date.monthValue}月", fontSize = 9.sp, color = Color(0xFFA8B3AC))
-                    Text("${ordered.last().photo.date.monthValue}月", fontSize = 9.sp, color = Color(0xFFA8B3AC))
-                }
+        // 时光滑轨面板（原型 .fs-slider：地图下方）
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xD9101312))
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+        ) {
+            Text(
+                if (shown >= ordered.size) "📅 全部时间 · ${ordered.size} 张" else "📅 至 ${points.last().photo.date.monthValue} 月 · $shown 张",
+                fontSize = 11.sp,
+                color = Color(0xFFA8B3AC),
+                modifier = Modifier.padding(bottom = 2.dp),
+            )
+            Slider(
+                value = shown.toFloat(),
+                onValueChange = { shown = it.toInt().coerceIn(1, ordered.size) },
+                valueRange = 1f..ordered.size.toFloat(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("${ordered.first().photo.date.monthValue}月", fontSize = 9.sp, color = Color(0xFFA8B3AC))
+                Text("${ordered.last().photo.date.monthValue}月", fontSize = 9.sp, color = Color(0xFFA8B3AC))
             }
         }
-    }
-    // 非全屏：地点大字列表 + 脚注（全屏模式按原型不显示列表）
-    if (!fullscreen) {
-        Spacer(Modifier.height(4.dp))
-        val groups = remember(points) { groupPlaces(points) }
-        groups.forEachIndexed { i, g ->
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 13.dp)
-                    .clickable(enabled = g.key == g.name) { onOpenPlace(g.name) },
-            ) {
-                Text(
-                    g.name,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = placeColors[i % placeColors.size],
-                )
-                Text(
-                    "${g.days} 次到访 · ${g.photos} 张照片" + if (g.key == g.name) " · 点击进入 ›" else "",
-                    fontSize = 11.sp,
-                    color = SubInk,
-                    modifier = Modifier.padding(top = 2.dp),
-                )
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "📍 照片按拍摄位置（EXIF）落点，仅存本地 · ⛶ 进全屏地图 · 底图 © 高德地图",
-            fontSize = 10.5.sp,
-            color = SubInk,
-        )
     }
 }
 
-/** 地图浮层小圆钮（＋－/←，原型 .zbtn/.fs-back） */
+/** 地图浮层小圆钮/小签（＋－/←/全部地点） */
 @Composable
 private fun MapChip(symbol: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Text(

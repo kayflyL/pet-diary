@@ -38,6 +38,7 @@ import com.petdiary.parrot.feature.me.MeScreen
 import com.petdiary.parrot.feature.food.FoodLibScreen
 import com.petdiary.parrot.feature.memories.MemoriesScreen
 import com.petdiary.parrot.feature.memories.PlaceDetailScreen
+import com.petdiary.parrot.feature.memories.PlacesScreen
 import com.petdiary.parrot.feature.pets.AddEditBirdScreen
 import com.petdiary.parrot.feature.pets.BirdDetailScreen
 import com.petdiary.parrot.feature.pets.BirdsScreen
@@ -133,6 +134,7 @@ fun AppNavHost(appearance: String, onCycleAppearance: () -> Unit) {
             composable("memories") {
                 MemoriesScreen(
                     onOpenPlace = { name -> nav.navigate("place/${android.net.Uri.encode(name)}") },
+                    onOpenPlaces = { nav.navigate("places") },
                 )
             }
             composable("birds") {
@@ -155,6 +157,12 @@ fun AppNavHost(appearance: String, onCycleAppearance: () -> Unit) {
                 arguments = listOf(navArgument("name") { type = NavType.StringType }),
             ) {
                 PlaceDetailScreen(onBack = { nav.popBackStack() })
+            }
+            composable("places") {
+                PlacesScreen(
+                    onBack = { nav.popBackStack() },
+                    onOpenPlace = { name -> nav.navigate("place/" + android.net.Uri.encode(name)) },
+                )
             }
             composable("expenses") { ExpensesScreen(onBack = { nav.popBackStack() }) }
             composable(

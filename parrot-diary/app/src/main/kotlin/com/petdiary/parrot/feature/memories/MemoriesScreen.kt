@@ -7,12 +7,15 @@ import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,9 +39,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +54,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -70,6 +77,7 @@ import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
 import org.osmdroid.events.ZoomEvent
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
@@ -87,6 +95,7 @@ private val TabIdle = Color(0xFFC7C9CC)
 fun MemoriesScreen(onOpenPlace: (String) -> Unit = {}, vm: MemoriesViewModel = hiltViewModel()) {
     val ui by vm.ui.collectAsState()
     var seg by remember { mutableIntStateOf(0) }
+    var mapFs by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     var viewer by remember { mutableStateOf<ViewerState?>(null) }
     val placeCount = ui.geotagged
@@ -94,58 +103,77 @@ fun MemoriesScreen(onOpenPlace: (String) -> Unit = {}, vm: MemoriesViewModel = h
         .size
 
     PaperTheme {
-        Scaffold { padding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .background(PaperBg)
-                    .verticalScroll(scrollState)
-                    .padding(18.dp),
-            ) {
-                Text(
-                    "MEMORIES",
-                    fontSize = 10.5.sp,
-                    letterSpacing = 2.5.sp,
-                    color = GreenInk,
-                    fontWeight = FontWeight.Bold,
-                )
-                // 巨型文字 Tab：大号文字即页签（StoryTeller DNA ①）
-                Row(Modifier.padding(top = 4.dp)) {
-                    listOf("故事", "地图", "照片").forEachIndexed { i, label ->
-                        Text(
-                            label,
-                            fontSize = 27.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = (-0.5).sp,
-                            color = if (seg == i) PaperInk else TabIdle,
-                            modifier = Modifier
-                                .padding(end = 13.dp)
-                                .clickable { seg = i },
-                        )
+        Box(Modifier.fillMaxSize()) {
+            Scaffold { padding ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .background(PaperBg)
+                        .verticalScroll(scrollState)
+                        .padding(18.dp),
+                ) {
+                    Text(
+                        "MEMORIES",
+                        fontSize = 10.5.sp,
+                        letterSpacing = 2.5.sp,
+                        color = GreenInk,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    // 巨型文字 Tab：大号文字即页签（StoryTeller DNA ①）
+                    Row(Modifier.padding(top = 4.dp)) {
+                        listOf("故事", "地图", "照片").forEachIndexed { i, label ->
+                            Text(
+                                label,
+                                fontSize = 27.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = (-0.5).sp,
+                                color = if (seg == i && !mapFs) PaperInk else if (mapFs) TabIdle else TabIdle,
+                                modifier = Modifier
+                                    .padding(end = 13.dp)
+                                    .clickable { seg = i },
+                            )
+                        }
+                    }
+                    Text(
+                        "${ui.stories.size} 个故事 · ${ui.photos.size} 张照片 · $placeCount 个地方",
+                        fontSize = 12.sp,
+                        color = SubInk,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+
+                    QuoteBlock()
+
+                    // 分段切换暂不做过渡动画：AnimatedContent 会让互操作 MapView 以 0 高
+                    // 参与 Compose 布局（View 实际仍按原尺寸绘制，压住列表），待互操作安全方案
+                    when (seg) {
+                        0 -> StoryWall(ui.stories, scrollState)
+                        1 -> if (!mapFs) {
+                            PhotoMap(
+                                geotagged = ui.geotagged,
+                                fullscreen = false,
+                                onOpenViewer = { viewer = it },
+                                onOpenPlace = onOpenPlace,
+                                onToggleFullscreen = { mapFs = true },
+                            )
+                        }
+                        else -> PhotoWall(ui.photos) { viewer = it }
                     }
                 }
-                Text(
-                    "${ui.stories.size} 个故事 · ${ui.photos.size} 张照片 · $placeCount 个地方",
-                    fontSize = 12.sp,
-                    color = SubInk,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-
-                QuoteBlock()
-
-                // 分段切换暂不做过渡动画：AnimatedContent 会让互操作 MapView 以 0 高
-                // 参与 Compose 布局（View 实际仍按 656px 绘制，压住列表），
-                // 待找到互操作安全的方案再补（§9 的 180ms 淡入位移暂缓）
-                when (seg) {
-                    0 -> StoryWall(ui.stories, scrollState)
-                    1 -> PhotoMap(ui.geotagged, onOpenViewer = { viewer = it }, onOpenPlace = onOpenPlace)
-                    else -> PhotoWall(ui.photos) { viewer = it }
-                }
             }
-        }
-        viewer?.let { state ->
-            PhotoViewer(state = state, onDismiss = { viewer = null })
+            // 全屏地图（原型 ⛶）：覆盖整个内容区含底部导航
+            if (mapFs) {
+                PhotoMap(
+                    geotagged = ui.geotagged,
+                    fullscreen = true,
+                    onOpenViewer = { viewer = it },
+                    onOpenPlace = onOpenPlace,
+                    onToggleFullscreen = { mapFs = false },
+                )
+            }
+            viewer?.let { state ->
+                PhotoViewer(state = state, onDismiss = { viewer = null })
+            }
         }
     }
 }
@@ -398,20 +426,21 @@ private fun groupPlaces(points: List<GeoPhoto>): List<PlaceGroup> =
         }
         .sortedByDescending { it.photos }
 
-/** 照片裁圆 + 白描边 → 圆形照片钉图标 */
-private fun circlePhotoDrawable(ctx: Context, path: String, sizeDp: Float): Drawable? {
+/** 照片裁圆 + 白描边 → 圆形照片钉图标；label 非空时在圆下画地名小签（全屏模式） */
+private fun circlePhotoDrawable(ctx: Context, path: String, sizeDp: Float, label: String? = null): Drawable? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(path, bounds)
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
     val density = ctx.resources.displayMetrics.density
     val sizePx = (sizeDp * density).toInt().coerceIn(32, 160)
+    val labPx = if (label != null) (18f * density).toInt() else 0
     val sample = maxOf(1, minOf(bounds.outWidth, bounds.outHeight) / (sizePx * 2))
     val bmp = BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
     val side = minOf(bmp.width, bmp.height)
     val sq = Bitmap.createBitmap(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side)
     val ring = 2.5f * density
     val radius = sizePx / 2f - ring
-    val out = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val out = Bitmap.createBitmap(sizePx, sizePx + labPx, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(out)
     val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = BitmapShader(sq, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply {
@@ -429,16 +458,18 @@ private fun circlePhotoDrawable(ctx: Context, path: String, sizeDp: Float): Draw
             color = android.graphics.Color.WHITE
         },
     )
+    if (label != null) drawLabelChip(canvas, label, sizePx / 2f, sizePx + 2f * density, density)
     return BitmapDrawable(ctx.resources, out)
 }
 
 /** 聚合气泡：主照片圆 + 右上角墨色计数徽章（缩小时相邻照片合成一点，放大自动散开） */
-private fun clusterDrawable(ctx: Context, firstPhotoPath: String, count: Int, sizeDp: Float): Drawable? {
+private fun clusterDrawable(ctx: Context, firstPhotoPath: String, count: Int, sizeDp: Float, label: String? = null): Drawable? {
     val density = ctx.resources.displayMetrics.density
     val sizePx = (sizeDp * density).toInt().coerceIn(40, 200)
     val base = circlePhotoDrawable(ctx, firstPhotoPath, sizeDp.toFloat()) as? BitmapDrawable
     val baseBmp = base?.bitmap ?: return null
-    val out = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val labPx = if (label != null) (18f * density).toInt() else 0
+    val out = Bitmap.createBitmap(sizePx, sizePx + labPx, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(out)
     canvas.drawBitmap(baseBmp, 0f, 0f, null)
     val badgeR = 9f * density
@@ -466,7 +497,27 @@ private fun clusterDrawable(ctx: Context, firstPhotoPath: String, count: Int, si
             isFakeBoldText = true
         },
     )
+    if (label != null) drawLabelChip(canvas, label, sizePx / 2f, sizePx + 2f * density, density)
     return BitmapDrawable(ctx.resources, out)
+}
+
+/** 圆点下的地名小签（原型 .ptag：墨底白字圆角） */
+private fun drawLabelChip(canvas: Canvas, text: String, cx: Float, top: Float, density: Float) {
+    val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        textSize = 10f * density
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+    }
+    val chipW = tp.measureText(text) + 12f * density
+    val chipH = 14f * density
+    canvas.drawRoundRect(
+        RectF(cx - chipW / 2, top, cx + chipW / 2, top + chipH),
+        6f * density,
+        6f * density,
+        Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xCC16241C.toInt() },
+    )
+    canvas.drawText(text, cx, top + chipH * 0.72f, tp)
 }
 
 /** 屏幕距离聚类：相邻 < clusterPx 的照片合成一个节点（每次缩放后按当前投影重算） */
@@ -498,10 +549,10 @@ private fun clusterNodes(map: MapView, points: List<GeoPhoto>, clusterPx: Float)
 /** 地图节点：1 张=单照片钉，>1 张=聚合气泡 */
 private data class MapNode(val photos: List<GeoPhoto>, val lat: Double, val lng: Double)
 
-/** 大图查看器的状态：某组照片 + 起始张（回忆模块内共用） */
+/** 大图查看器的状态：某组照片 + 起始张 */
 internal data class ViewerState(val photos: List<PhotoUi>, val startIndex: Int)
 
-/** 全屏大图查看：左右切换同组照片，点任意处关闭 */
+/** 全屏大图查看：左右切换同组照片；点击图片缩放（2.1x），放大后拖拽平移/双指捏合 */
 @Composable
 internal fun PhotoViewer(state: ViewerState, onDismiss: () -> Unit) {
     Dialog(
@@ -509,19 +560,43 @@ internal fun PhotoViewer(state: ViewerState, onDismiss: () -> Unit) {
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         val pagerState = rememberPagerState(initialPage = state.startIndex) { state.photos.size }
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color(0xFF0F1210))
-                .clickable(onClick = onDismiss),
-        ) {
-            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { i ->
-                AsyncImage(
-                    model = java.io.File(state.photos[i].path),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit,
-                )
+        var zoom by remember { mutableFloatStateOf(1f) }
+        var tx by remember { mutableFloatStateOf(0f) }
+        var ty by remember { mutableFloatStateOf(0f) }
+        Box(Modifier.fillMaxSize().background(Color(0xFF0F1210))) {
+            HorizontalPager(state = pagerState, userScrollEnabled = zoom == 1f, modifier = Modifier.fillMaxSize()) { i ->
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    AsyncImage(
+                        model = java.io.File(state.photos[i].path),
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = zoom
+                                scaleY = zoom
+                                translationX = if (pagerState.currentPage == i) tx else 0f
+                                translationY = if (pagerState.currentPage == i) ty else 0f
+                            }
+                            .pointerInput(Unit) {
+                                detectTapGestures(onTap = {
+                                    zoom = if (zoom > 1f) 1f else 2.1f
+                                    if (zoom == 1f) { tx = 0f; ty = 0f }
+                                })
+                            }
+                            .pointerInput(zoom > 1f) {
+                                if (zoom > 1f) {
+                                    detectTransformGestures { _, pan, gestureZoom, _ ->
+                                        val nz = (zoom * gestureZoom).coerceIn(1f, 4f)
+                                        zoom = nz
+                                        tx += pan.x
+                                        ty += pan.y
+                                        if (nz == 1f) { tx = 0f; ty = 0f }
+                                    }
+                                }
+                            },
+                    )
+                }
             }
             state.photos.getOrNull(pagerState.currentPage)?.let { p ->
                 Column(
@@ -537,12 +612,20 @@ internal fun PhotoViewer(state: ViewerState, onDismiss: () -> Unit) {
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        SimpleDateFormat("M 月 d 日", Locale.CHINESE).format(Date(p.date.toEpochDay() * 86400000L)) +
+                        SimpleDateFormat("M 月 d 日 HH:mm", Locale.CHINESE).format(Date(p.takenAt ?: p.date.toEpochDay() * 86400000L)) +
                             " · ${pagerState.currentPage + 1}/${state.photos.size}",
                         color = Color.White.copy(alpha = 0.75f),
                         fontSize = 12.sp,
                         modifier = Modifier.padding(top = 3.dp),
                     )
+                    if (p.lat != null && p.lng != null) {
+                        Text(
+                            "📍 " + "%.4f, %.4f".format(p.lat, p.lng),
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
                 }
             }
             Text(
@@ -563,12 +646,17 @@ internal fun PhotoViewer(state: ViewerState, onDismiss: () -> Unit) {
 /** 快览卡状态：某组照片 + 当前张（点预览图进全屏查看器）——移植自用户 photo_gallery 的聚合弹窗 */
 private data class QuickView(val photos: List<PhotoUi>, val index: Int)
 
-/** 照片地图：高德底图 + 照片钉 + 缩放聚合 + 快览卡 + 时光滑轨 + 地点大字列表 */
+/**
+ * 照片地图（原型 v3.4 对齐）：高德底图 + 照片钉 + 缩放聚合分散 + 地图内快览浮层
+ * + 时光滑轨（全屏）+ ⛶ 全屏模式 + fitBounds 自适应。
+ */
 @Composable
 private fun PhotoMap(
     geotagged: List<PhotoUi>,
+    fullscreen: Boolean,
     onOpenViewer: (ViewerState) -> Unit,
     onOpenPlace: (String) -> Unit,
+    onToggleFullscreen: () -> Unit,
 ) {
     val all = geotagged.mapNotNull { p ->
         val lat = p.lat ?: return@mapNotNull null
@@ -585,13 +673,14 @@ private fun PhotoMap(
         return
     }
     // 时光滑轨：按拍摄时间升序，拖动看照片一点点亮起（points = 当前亮起的子集）
-    val ordered = remember(all) { all.sortedBy { it.photo.date.toEpochDay() } }
+    val ordered = remember(all) { all.sortedBy { it.photo.takenAt ?: (it.photo.date.toEpochDay() * 86400000L) } }
     var shown by remember { mutableIntStateOf(ordered.size) }
     val points = remember(ordered, shown) { ordered.take(shown) }
     var quick by remember { mutableStateOf<QuickView?>(null) }
     val ctx = LocalContext.current
     var clusterTick by remember { mutableIntStateOf(0) }
     val mapRadiusPx = 18f * ctx.resources.displayMetrics.density
+    val placeCount = remember(points) { points.groupBy { placeKeyOf(it) }.size }
     val mapView = remember {
         org.osmdroid.config.Configuration.getInstance().apply {
             userAgentValue = ctx.packageName
@@ -601,6 +690,7 @@ private fun PhotoMap(
         MapView(ctx).apply {
             setTileSource(amapTileSource())
             setMultiTouchControls(true)
+            zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
             // 互操作层不响应 Compose 的 clip；圆角与边界裁剪只能在 View 自身做
             clipToOutline = true
             outlineProvider = object : android.view.ViewOutlineProvider() {
@@ -621,177 +711,244 @@ private fun PhotoMap(
     }
     // 读一下 tick：缩放发生时触发重组，让下面的 update 重新聚类
     val tick = clusterTick
-    // 地图与快览浮层同层：弹窗"长在地图上"（对齐 photo_gallery 的锚定弹窗）
-    Box(Modifier.fillMaxWidth().height(300.dp)) {
-    AndroidView(
-        modifier = Modifier
-            .fillMaxSize(),
-        factory = { c ->
-            mapView.apply {
-                controller.setZoom(13.0)
-                val centerLat = points.map { it.lat }.average()
-                val centerLng = points.map { it.lng }.average()
-                controller.setCenter(GeoPoint(centerLat, centerLng))
-            }
-        },
-        update = { map ->
-            map.overlays.clear()
-            val density = ctx.resources.displayMetrics.density
-            val nodes = clusterNodes(map, points, 46f * density)
-            nodes.forEach { node ->
-                map.overlays.add(
-                    Marker(map).apply {
-                        position = GeoPoint(node.lat, node.lng)
-                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                        if (node.photos.size == 1) {
-                            circlePhotoDrawable(ctx, node.photos[0].photo.path, 40f)?.let { icon = it }
-                        } else {
-                            clusterDrawable(ctx, node.photos[0].photo.path, node.photos.size, 46f)?.let { icon = it }
-                        }
-                        setOnMarkerClickListener { _, _ ->
-                            val distinctPlaces = node.photos.map { placeKeyOf(it) }.distinct()
-                            val openQuick: () -> Unit = {
-                                if (node.photos.size == 1) {
-                                    // 单张：快览卡从该张起步，左右滑切换同一地点的全部照片
-                                    val key = placeKeyOf(node.photos[0])
-                                    val group = points.filter { placeKeyOf(it) == key }
-                                    val start = group.indexOfFirst { it.photo.id == node.photos[0].photo.id }.coerceAtLeast(0)
-                                    quick = QuickView(group.map { it.photo }, start)
-                                } else {
-                                    quick = QuickView(node.photos.map { it.photo }, 0)
-                                }
-                            }
-                            if (node.photos.size == 1 || distinctPlaces.size == 1 || map.zoomLevelDouble >= 17.0) {
-                                // 单点、或整组同一地点：直接开快览卡（同地点照片永远聚合在一起，
-                                // 等缩放拆开是等不到的）；缩放很深仍聚合时也直接看
-                                openQuick()
-                            } else {
-                                // 聚合点混着多个地点：放大散开再挑
-                                map.controller.animateTo(GeoPoint(node.lat, node.lng))
-                                map.controller.zoomIn()
-                            }
-                            true
-                        }
-                    },
-                )
-            }
-            map.invalidate()
-        },
-    )
-    // 快览浮层（photo_gallery 两段式第一段：预览 + 左右切换，点预览图进全屏）
-    quick?.let { q ->
-        Column(
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .then(if (fullscreen) Modifier.fillMaxSize() else Modifier.height(300.dp)),
+    ) {
+        // 地图区：快览浮层/缩放钮/提示签都"长在地图上"（对齐原型）
+        Box(
             Modifier
-                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(10.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xF2101412)),
+                .then(if (fullscreen) Modifier.weight(1f) else Modifier.height(300.dp)),
         ) {
-            Box(Modifier.fillMaxWidth().height(170.dp)) {
-                AsyncImage(
-                    model = java.io.File(q.photos[q.index].path),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clickable { onOpenViewer(ViewerState(q.photos, q.index)) },
-                    contentScale = ContentScale.Fit,
-                )
-                QuickNavBtn(
-                    "‹",
-                    Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(10.dp),
-                ) { quick = q.copy(index = (q.index - 1 + q.photos.size) % q.photos.size) }
-                QuickNavBtn(
-                    "›",
-                    Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(10.dp),
-                ) { quick = q.copy(index = (q.index + 1) % q.photos.size) }
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { c ->
+                    mapView.apply {
+                        // fitBounds：按可见照片范围自适应缩放（对齐 photo_gallery）
+                        val bb = BoundingBox.fromGeoPoints(points.map { GeoPoint(it.lat, it.lng) })
+                        controller.setCenter(GeoPoint((bb.latSouth + bb.latNorth) / 2, (bb.lonWest + bb.lonEast) / 2))
+                        post { zoomToBoundingBox(bb.increaseByScale(1.25f), false) }
+                    }
+                },
+                update = { map ->
+                    map.overlays.clear()
+                    val density = ctx.resources.displayMetrics.density
+                    val nodes = clusterNodes(map, points, 46f * density)
+                    nodes.forEach { node ->
+                        map.overlays.add(
+                            Marker(map).apply {
+                                position = GeoPoint(node.lat, node.lng)
+                                // 全屏模式给圆点画地名签；混合了多个地点的聚合不标单一地名
+                                val label = if (fullscreen && node.photos.map { placeKeyOf(it) }.distinct().size == 1) {
+                                    node.photos[0].photo.placeName
+                                } else null
+                                val labDp = if (label != null) 18f else 0f
+                                if (node.photos.size == 1) {
+                                    circlePhotoDrawable(ctx, node.photos[0].photo.path, 40f, label)?.let { icon = it }
+                                    setAnchor(Marker.ANCHOR_CENTER, 20f / (40f + labDp))
+                                } else {
+                                    clusterDrawable(ctx, node.photos[0].photo.path, node.photos.size, 46f, label)?.let { icon = it }
+                                    setAnchor(Marker.ANCHOR_CENTER, 23f / (46f + labDp))
+                                }
+                                // 对齐原型：点任何钉/聚合都弹快览卡（photo_gallery zoomToBoundsOnClick:false）
+                                setOnMarkerClickListener { _, _ ->
+                                    if (node.photos.size == 1) {
+                                        val key = placeKeyOf(node.photos[0])
+                                        val group = points.filter { placeKeyOf(it) == key }
+                                        val start = group.indexOfFirst { it.photo.id == node.photos[0].photo.id }.coerceAtLeast(0)
+                                        quick = QuickView(group.map { it.photo }, start)
+                                    } else {
+                                        quick = QuickView(node.photos.map { it.photo }, 0)
+                                    }
+                                    true
+                                }
+                            },
+                        )
+                    }
+                    map.invalidate()
+                },
+            )
+            // ＋－ 缩放按钮（原型 .zbtns 左下）
+            Column(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                MapChip("＋") { mapView.controller.zoomIn() }
+                MapChip("－") { mapView.controller.zoomOut() }
+            }
+            // 提示浮签（原型 .zoomnote 右下）
+            Text(
+                "双指缩放 · 放大后聚合散开成单张照片 · 拖动平移",
+                fontSize = 10.sp,
+                color = SubInk,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .background(Color(0xFFE7EEE7), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+            if (fullscreen) {
+                // ← 退出全屏（原型 .fs-back）
+                MapChip("←", Modifier.align(Alignment.TopStart).padding(12.dp)) { onToggleFullscreen() }
+                // 统计浮牌（原型 .fs-stats）
                 Text(
-                    "✕",
+                    "📍 ${points.size} 张有位置信息 · $placeCount 个地方",
+                    fontSize = 10.5.sp,
                     color = Color.White,
-                    fontSize = 12.sp,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .background(Color(0x66000000), CircleShape)
-                        .clickable { quick = null }
-                        .padding(7.dp),
+                        .padding(12.dp)
+                        .background(Color(0xB3101914), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
                 )
+            } else {
+                // ⛶ 进入全屏（原型 .fs-btn）
+                MapChip("⛶", Modifier.align(Alignment.TopEnd).padding(10.dp)) { onToggleFullscreen() }
             }
-            val p = q.photos[q.index]
-            Row(
+            // 快览浮层（两段式第一段：预览 + 左右切换，点预览图进全屏）
+            quick?.let { q ->
+                Column(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(10.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xF2101412)),
+                ) {
+                    Box(Modifier.fillMaxWidth().height(170.dp)) {
+                        AsyncImage(
+                            model = java.io.File(q.photos[q.index].path),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clickable { onOpenViewer(ViewerState(q.photos, q.index)) },
+                            contentScale = ContentScale.Fit,
+                        )
+                        QuickNavBtn(
+                            "‹",
+                            Modifier
+                                .align(Alignment.CenterStart)
+                                .padding(10.dp),
+                        ) { quick = q.copy(index = (q.index - 1 + q.photos.size) % q.photos.size) }
+                        QuickNavBtn(
+                            "›",
+                            Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(10.dp),
+                        ) { quick = q.copy(index = (q.index + 1) % q.photos.size) }
+                        Text(
+                            "✕",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp)
+                                .background(Color(0x66000000), CircleShape)
+                                .clickable { quick = null }
+                                .padding(7.dp),
+                        )
+                    }
+                    val p = q.photos[q.index]
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            (p.placeName ?: "拍摄地点") + " · " +
+                                SimpleDateFormat("M 月 d 日 HH:mm", Locale.CHINESE).format(Date(p.takenAt ?: p.date.toEpochDay() * 86400000L)),
+                            fontSize = 11.sp,
+                            color = Color(0xFFA8B3AC),
+                        )
+                        Text("${q.index + 1} / ${q.photos.size}", fontSize = 11.sp, color = Color(0xFFA8B3AC))
+                    }
+                }
+            }
+        }
+        // 时光滑轨面板（原型 .fs-slider：全屏时位于地图下方，不与地图重叠）
+        if (fullscreen) {
+            Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xD9101312))
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
             ) {
                 Text(
-                    (p.placeName ?: "拍摄地点") + " · " +
-                        SimpleDateFormat("M 月 d 日 HH:mm", Locale.CHINESE).format(Date(p.takenAt ?: p.date.toEpochDay() * 86400000L)),
+                    if (shown >= ordered.size) "📅 全部时间 · ${ordered.size} 张" else "📅 至 ${points.last().photo.date.monthValue} 月 · $shown 张",
                     fontSize = 11.sp,
                     color = Color(0xFFA8B3AC),
+                    modifier = Modifier.padding(bottom = 2.dp),
                 )
-                Text("${q.index + 1} / ${q.photos.size}", fontSize = 11.sp, color = Color(0xFFA8B3AC))
+                Slider(
+                    value = shown.toFloat(),
+                    onValueChange = { shown = it.toInt().coerceIn(1, ordered.size) },
+                    valueRange = 1f..ordered.size.toFloat(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("${ordered.first().photo.date.monthValue}月", fontSize = 9.sp, color = Color(0xFFA8B3AC))
+                    Text("${ordered.last().photo.date.monthValue}月", fontSize = 9.sp, color = Color(0xFFA8B3AC))
+                }
             }
         }
     }
-    }
-    // 时光滑轨（photo_gallery 年份滑轨 × 原型 scrub：拖动看照片随时间生长）
-    Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
-        Slider(
-            value = shown.toFloat(),
-            onValueChange = { shown = it.toInt().coerceIn(1, ordered.size) },
-            valueRange = 1f..ordered.size.toFloat(),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("${ordered.first().photo.date.monthValue} 月 · 启程", fontSize = 10.5.sp, color = SubInk)
-            Text("${ordered.last().photo.date.monthValue} 月 · 今天", fontSize = 10.5.sp, color = SubInk)
+    // 非全屏：地点大字列表 + 脚注（全屏模式按原型不显示列表）
+    if (!fullscreen) {
+        Spacer(Modifier.height(4.dp))
+        val groups = remember(points) { groupPlaces(points) }
+        groups.forEachIndexed { i, g ->
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 13.dp)
+                    .clickable(enabled = g.key == g.name) { onOpenPlace(g.name) },
+            ) {
+                Text(
+                    g.name,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = placeColors[i % placeColors.size],
+                )
+                Text(
+                    "${g.days} 次到访 · ${g.photos} 张照片" + if (g.key == g.name) " · 点击进入 ›" else "",
+                    fontSize = 11.sp,
+                    color = SubInk,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
         }
+        Spacer(Modifier.height(8.dp))
         Text(
-            "📍 时光滑轨：已亮起 $shown / ${ordered.size} 张 · 点气泡看大图 · 点地点进详情",
+            "📍 照片按拍摄位置（EXIF）落点，仅存本地 · ⛶ 进全屏地图 · 底图 © 高德地图",
             fontSize = 10.5.sp,
             color = SubInk,
-            modifier = Modifier.padding(top = 2.dp),
         )
     }
-    Spacer(Modifier.height(4.dp))
-    val groups = remember(points) { groupPlaces(points) }
-    groups.forEachIndexed { i, g ->
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 13.dp)
-                .clickable(enabled = g.key == g.name) { onOpenPlace(g.name) },
-        ) {
-            Text(
-                g.name,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = placeColors[i % placeColors.size],
-            )
-            Text(
-                "${g.days} 次到访 · ${g.photos} 张照片" + if (g.key == g.name) " · 点击进入 ›" else "",
-                fontSize = 11.sp,
-                color = SubInk,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-        }
-    }
-    Spacer(Modifier.height(8.dp))
+}
+
+/** 地图浮层小圆钮（＋－/←，原型 .zbtn/.fs-back） */
+@Composable
+private fun MapChip(symbol: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Text(
-        "📍 照片按拍摄位置（EXIF）落点，仅存本地 · 缩小地图自动聚合 · 底图 © 高德地图",
-        fontSize = 10.5.sp,
-        color = SubInk,
+        symbol,
+        color = Color.White,
+        fontSize = 14.sp,
+        modifier = modifier
+            .background(Color(0x99101914), CircleShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
     )
 }
 
 /** 快览卡的圆形左右切换钮 */
 @Composable
-private fun QuickNavBtn(symbol: String, modifier: Modifier, onClick: () -> Unit) {
+private fun QuickNavBtn(symbol: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Text(
         symbol,
         color = Color.White,

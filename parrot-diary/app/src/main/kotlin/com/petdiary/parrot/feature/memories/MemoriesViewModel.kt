@@ -32,6 +32,8 @@ data class PhotoUi(
     val lat: Double?,
     val lng: Double?,
     val placeName: String? = null,
+    /** 拍摄/入库毫秒时间（快览卡显示完整时间戳用） */
+    val takenAt: Long? = null,
 )
 
 data class MemoriesUi(
@@ -86,6 +88,7 @@ class MemoriesViewModel @Inject constructor(
                     lat = m.lat,
                     lng = m.lng,
                     placeName = geoById[m.id]?.placeName,
+                    takenAt = m.takenAt ?: m.createdAt,
                 )
             }
 

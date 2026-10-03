@@ -621,10 +621,11 @@ private fun PhotoMap(
     }
     // 读一下 tick：缩放发生时触发重组，让下面的 update 重新聚类
     val tick = clusterTick
+    // 地图与快览浮层同层：弹窗"长在地图上"（对齐 photo_gallery 的锚定弹窗）
+    Box(Modifier.fillMaxWidth().height(300.dp)) {
     AndroidView(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(250.dp),
+            .fillMaxSize(),
         factory = { c ->
             mapView.apply {
                 controller.setZoom(13.0)
@@ -677,16 +678,17 @@ private fun PhotoMap(
             map.invalidate()
         },
     )
-    // 快览卡（photo_gallery 两段式第一段：预览 + 左右切换，点预览图进全屏）
+    // 快览浮层（photo_gallery 两段式第一段：预览 + 左右切换，点预览图进全屏）
     quick?.let { q ->
         Column(
             Modifier
+                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(top = 8.dp)
+                .padding(10.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFF121713)),
+                .background(Color(0xF2101412)),
         ) {
-            Box(Modifier.fillMaxWidth().height(190.dp)) {
+            Box(Modifier.fillMaxWidth().height(170.dp)) {
                 AsyncImage(
                     model = java.io.File(q.photos[q.index].path),
                     contentDescription = null,
@@ -728,13 +730,14 @@ private fun PhotoMap(
             ) {
                 Text(
                     (p.placeName ?: "拍摄地点") + " · " +
-                        SimpleDateFormat("M 月 d 日", Locale.CHINESE).format(Date(p.date.toEpochDay() * 86400000L)),
+                        SimpleDateFormat("M 月 d 日 HH:mm", Locale.CHINESE).format(Date(p.takenAt ?: p.date.toEpochDay() * 86400000L)),
                     fontSize = 11.sp,
                     color = Color(0xFFA8B3AC),
                 )
                 Text("${q.index + 1} / ${q.photos.size}", fontSize = 11.sp, color = Color(0xFFA8B3AC))
             }
         }
+    }
     }
     // 时光滑轨（photo_gallery 年份滑轨 × 原型 scrub：拖动看照片随时间生长）
     Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {

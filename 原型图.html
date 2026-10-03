@@ -23,6 +23,11 @@ body{background:#141618;font-family:-apple-system,'MiSans','HarmonyOS Sans SC','
 #phone{position:relative;width:min(420px,100%);height:min(880px,96vh);background:var(--bg);border-radius:32px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.6);transition:background .25s}
 .screen{position:absolute;inset:0;overflow-y:auto;padding:18px 18px 128px;display:none;scrollbar-width:none}
 .screen.active{display:block;animation:fadein .18s ease-out}
+#s-mem.active{display:flex;flex-direction:column}
+#m-map{flex:none;height:calc(100vh - 148px);display:flex;flex-direction:column;margin:-18px -18px 0}
+#m-map .papermap{flex:1;height:auto;border:none;border-radius:0}
+#m-map .fs-slider{margin:0 12px 132px}
+.places-chip{position:absolute;top:12px;left:12px;background:rgba(16,19,18,.72);color:#fff;font-size:10.5px;padding:4px 10px;border-radius:999px;z-index:6;cursor:pointer}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .screen::-webkit-scrollbar{display:none}
 h1{font-size:20px;font-weight:700;letter-spacing:-.2px}
@@ -297,9 +302,6 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
 .fs-back{position:absolute;top:10px;left:10px;width:30px;height:30px;border-radius:50%;background:rgba(16,19,18,.55);color:#fff;font-size:14px;cursor:pointer;z-index:7;display:flex;align-items:center;justify-content:center}
 .fs-stats{position:absolute;top:12px;right:12px;background:rgba(16,19,18,.72);color:#fff;font-size:10.5px;padding:4px 10px;border-radius:999px;z-index:6;display:block}
 .ptag{position:absolute;transform:translate(-50%,0);font-size:9.5px;background:rgba(16,19,18,.75);color:#fff;padding:1px 7px;border-radius:6px;z-index:3;display:block;white-space:nowrap}
-#mapfs{position:fixed;inset:0;z-index:900;background:#EFEBE2;display:flex;flex-direction:column;padding:10px 10px 0}
-#mapfs.hidden{display:none}
-#mapfs .papermap{flex:1;height:auto;border-radius:14px}
 .fs-slider{display:block;margin:10px 2px;background:rgba(16,19,18,.85);border-radius:12px;padding:8px 14px 6px;color:#fff}
 .fs-slider .sl-label{font-size:11px;text-align:center;margin-bottom:2px}
 .fs-slider input[type=range]{width:100%;accent-color:#2F8F5B}
@@ -464,38 +466,6 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
   </div>
 
   <div id="m-map" class="hidden">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;margin:2px 2px 10px">
-      <span style="font-size:14.5px;font-weight:700">去过的地方</span>
-      <span onclick="nav('s-places')" style="font-size:11px;color:var(--pri);font-weight:700;cursor:pointer">全部地点 ›</span>
-    </div>
-    <div class="pcar">
-      <div class="pcard" onclick="nav('s-place')">
-        <div class="cov" style="background:linear-gradient(140deg,#CBE5D6,#5FA97E)">🌳<span class="n">3</span></div>
-        <div class="pb"><div class="pn">人民公园</div><div class="pm">3 张 · 2 次到访</div></div>
-      </div>
-      <div class="pcard" onclick="nav('s-place')">
-        <div class="cov" style="background:linear-gradient(140deg,#CBE5D6,#5FA97E)">🦜<span class="n">3</span></div>
-        <div class="pb"><div class="pn">家 · 大本营</div><div class="pm">3 张 · 每一天</div></div>
-      </div>
-      <div class="pcard" onclick="nav('s-place')">
-        <div class="cov" style="background:linear-gradient(140deg,#FFE9BE,#F0C25F)">🏡<span class="n">2</span></div>
-        <div class="pb"><div class="pn">外婆家</div><div class="pm">2 张 · 1 次到访</div></div>
-      </div>
-      <div class="pcard" onclick="nav('s-place')">
-        <div class="cov" style="background:linear-gradient(140deg,#D4E5F7,#8FB3D9)">🏥<span class="n">1</span></div>
-        <div class="pb"><div class="pn">安安异宠医院</div><div class="pm">1 张 · 2025 年</div></div>
-      </div>
-      <div class="pcard" style="background:var(--surface);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px" onclick="mapFs(true)">
-        <span style="font-size:24px">⛶</span>
-        <span style="font-size:11.5px;font-weight:700">在地图上查看</span>
-        <span style="font-size:10px;color:var(--sub)">缩放 · 聚合 · 时光滑轨</span>
-      </div>
-    </div>
-    <div class="mquote" style="margin-top:14px">“你在公园的一天，可以变成更深层的故事：告诉人们那张照片是在哪里拍的。” <b>—— 位置就是情感元数据</b></div>
-    <div class="refnote" style="margin-top:8px">去过的地方按照片数排序 · ⛶ 进全屏地图：缩放看聚合分散、滑轨按时间生长 · 底图为纸面示意，正式版接高德</div>
-  </div>
-
-  <div id="mapfs" class="hidden">
     <div class="papermap" id="pmap">
       <div class="world" id="world">
       <div class="park"></div><div class="water"></div>
@@ -517,11 +487,9 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
       <span class="ptag" style="left:22%;top:88%">外婆家</span>
       <span class="ptag" style="left:30%;top:45%">安安异宠医院</span>
       </div>
-      <span class="fs-back" onclick="event.stopPropagation();mapFs(false)">←</span>
-      <span class="fs-stats">📍 9 张有位置信息 · 3 个地方</span>
+      <span class="fs-stats">📍 9 张有位置信息 · 4 个地方</span>
       <div class="zbtns"><span class="zbtn" onclick="event.stopPropagation();mzStep(1)">＋</span><span class="zbtn" onclick="event.stopPropagation();mzStep(-1)">－</span></div>
       <span class="zoomnote">滚轮或＋－缩放 · 放大后聚合散开成单张照片 · 拖拽平移</span>
-      <span class="fs-btn" onclick="event.stopPropagation();mapFs(true)" title="全屏地图">⛶</span>
       <div class="qp" id="qp" onclick="event.stopPropagation()">
         <span class="qp-x" onclick="event.stopPropagation();qpClose()">✕</span>
         <div class="qp-img" id="qp-img" onclick="event.stopPropagation();pvOpen(qpK,qpI)" title="点击查看大图"></div>
@@ -535,6 +503,8 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
       <input type="range" min="0" max="9" value="9" oninput="fsSlide(this.value)">
       <div class="sl-ticks"><span>2025-12</span><span>2026-04</span><span>2026-06</span><span>2026-08</span><span>2026-09</span><span>2026-10</span></div>
     </div>
+  </div>
+
   </div>
 
   <div id="m-photo" class="hidden">  <div id="m-photo" class="hidden">
@@ -856,7 +826,7 @@ document.getElementById('pv-gps').textContent='📍 '+pl.gps;
 function pvMove(d){pvI=Math.max(0,Math.min(PVDATA[pvK].photos.length-1,pvI+d));pvRender();}
 function pvClose(){document.getElementById('pv').classList.remove('show');}
 let qpK='home',qpI=0;
-function qpOpen(k,el,i){qpK=k;qpI=i||0;const qp=document.getElementById('qp');const pm=document.querySelector('#mapfs .papermap');
+function qpOpen(k,el,i){qpK=k;qpI=i||0;const qp=document.getElementById('qp');const pm=document.querySelector('#pmap');
  const pr=pm.getBoundingClientRect(),er=el.getBoundingClientRect();
  const cx=er.left-pr.left+er.width/2, cy=er.top-pr.top;
  qp.classList.add('show');
@@ -871,7 +841,6 @@ function qpRender(){const pl=PVDATA[qpK];const p=pl.photos[qpI];
  document.getElementById('qp-idx').textContent=(qpI+1)+' / '+pl.photos.length;}
 function qpMove(d){qpI=(qpI+d+PVDATA[qpK].photos.length)%PVDATA[qpK].photos.length;qpRender();}
 function qpClose(){document.getElementById('qp').classList.remove('show');}
-function mapFs(on){document.getElementById('mapfs').classList.toggle('hidden',!on);qpClose();}
 function fsSlide(v){v=+v;const show={vet:v>=1,grandma:v>=2,park:v>=4,home:v>=7};
  document.querySelectorAll('#m-map .pcl').forEach(el=>{const m=el.getAttribute('onclick').match(/qpOpen\('(\w+)'/);if(m)el.style.display=show[m[1]]?'flex':'none';});
  document.getElementById('fs-label').textContent=v>=9?'📅 全部时间 · 9 张':v>=4?'📅 至 2026-09 · 6 张':v>=2?'📅 至 2026-08 · 3 张':'📅 至 2025-12 · 1 张';

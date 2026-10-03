@@ -28,10 +28,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -82,7 +84,7 @@ private val TabIdle = Color(0xFFC7C9CC)
 
 /** 回忆 · 纸面（APP设计文档.md §7，StoryTeller 结构）· 数据来自 MemoriesViewModel */
 @Composable
-fun MemoriesScreen(vm: MemoriesViewModel = hiltViewModel()) {
+fun MemoriesScreen(onOpenPlace: (String) -> Unit = {}, vm: MemoriesViewModel = hiltViewModel()) {
     val ui by vm.ui.collectAsState()
     var seg by remember { mutableIntStateOf(0) }
     val scrollState = rememberScrollState()
@@ -137,7 +139,7 @@ fun MemoriesScreen(vm: MemoriesViewModel = hiltViewModel()) {
                 // 待找到互操作安全的方案再补（§9 的 180ms 淡入位移暂缓）
                 when (seg) {
                     0 -> StoryWall(ui.stories, scrollState)
-                    1 -> PhotoMap(ui.geotagged) { viewer = it }
+                    1 -> PhotoMap(ui.geotagged, onOpenViewer = { viewer = it }, onOpenPlace = onOpenPlace)
                     else -> PhotoWall(ui.photos) { viewer = it }
                 }
             }
@@ -379,14 +381,15 @@ private data class GeoPhoto(val lat: Double, val lng: Double, val photo: PhotoUi
 /** 地点归组键：有名用名（可手动归并），无名按坐标就近聚合（约百米粒度） */
 private fun placeKeyOf(g: GeoPhoto): String = g.photo.placeName ?: "%.3f,%.3f".format(g.lat, g.lng)
 
-/** 按地点聚合的列表行（设计文档 §7：大字地点列表，无卡片框） */
-private data class PlaceGroup(val name: String, val cover: String, val photos: Int, val days: Int)
+/** 按地点聚合的列表行（设计文档 §7：大字地点列表，无卡片框）；key=归组键，named=有地名可进详情 */
+private data class PlaceGroup(val key: String, val name: String, val cover: String, val photos: Int, val days: Int)
 
 private fun groupPlaces(points: List<GeoPhoto>): List<PlaceGroup> =
     points
         .groupBy { placeKeyOf(it) }
-        .map { (_, list) ->
+        .map { (key, list) ->
             PlaceGroup(
+                key = key,
                 name = list.first().photo.placeName ?: "%.4f, %.4f".format(list.first().lat, list.first().lng),
                 cover = list.first().photo.path,
                 photos = list.size,
@@ -495,12 +498,12 @@ private fun clusterNodes(map: MapView, points: List<GeoPhoto>, clusterPx: Float)
 /** 地图节点：1 张=单照片钉，>1 张=聚合气泡 */
 private data class MapNode(val photos: List<GeoPhoto>, val lat: Double, val lng: Double)
 
-/** 大图查看器的状态：某组照片 + 起始张 */
-private data class ViewerState(val photos: List<PhotoUi>, val startIndex: Int)
+/** 大图查看器的状态：某组照片 + 起始张（回忆模块内共用） */
+internal data class ViewerState(val photos: List<PhotoUi>, val startIndex: Int)
 
 /** 全屏大图查看：左右切换同组照片，点任意处关闭 */
 @Composable
-private fun PhotoViewer(state: ViewerState, onDismiss: () -> Unit) {
+internal fun PhotoViewer(state: ViewerState, onDismiss: () -> Unit) {
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -557,15 +560,22 @@ private fun PhotoViewer(state: ViewerState, onDismiss: () -> Unit) {
     }
 }
 
-/** 照片地图：高德底图 + 照片钉 + 缩放聚合 + 点击看同地点大图（2026-10-03 定案，替代旧"行迹"轨迹线） */
+/** 快览卡状态：某组照片 + 当前张（点预览图进全屏查看器）——移植自用户 photo_gallery 的聚合弹窗 */
+private data class QuickView(val photos: List<PhotoUi>, val index: Int)
+
+/** 照片地图：高德底图 + 照片钉 + 缩放聚合 + 快览卡 + 时光滑轨 + 地点大字列表 */
 @Composable
-private fun PhotoMap(geotagged: List<PhotoUi>, onOpenViewer: (ViewerState) -> Unit) {
-    val points = geotagged.mapNotNull { p ->
+private fun PhotoMap(
+    geotagged: List<PhotoUi>,
+    onOpenViewer: (ViewerState) -> Unit,
+    onOpenPlace: (String) -> Unit,
+) {
+    val all = geotagged.mapNotNull { p ->
         val lat = p.lat ?: return@mapNotNull null
         val lng = p.lng ?: return@mapNotNull null
         GeoPhoto(lat, lng, p)
     }
-    if (points.isEmpty()) {
+    if (all.isEmpty()) {
         Text(
             "拍照会自动记录拍摄地点（EXIF）——有了第一张带位置的照片，这里就会亮起照片地图",
             style = MaterialTheme.typography.bodyMedium,
@@ -574,6 +584,11 @@ private fun PhotoMap(geotagged: List<PhotoUi>, onOpenViewer: (ViewerState) -> Un
         )
         return
     }
+    // 时光滑轨：按拍摄时间升序，拖动看照片一点点亮起（points = 当前亮起的子集）
+    val ordered = remember(all) { all.sortedBy { it.photo.date.toEpochDay() } }
+    var shown by remember { mutableIntStateOf(ordered.size) }
+    val points = remember(ordered, shown) { ordered.take(shown) }
+    var quick by remember { mutableStateOf<QuickView?>(null) }
     val ctx = LocalContext.current
     var clusterTick by remember { mutableIntStateOf(0) }
     val mapRadiusPx = 18f * ctx.resources.displayMetrics.density
@@ -634,21 +649,21 @@ private fun PhotoMap(geotagged: List<PhotoUi>, onOpenViewer: (ViewerState) -> Un
                         }
                         setOnMarkerClickListener { _, _ ->
                             val distinctPlaces = node.photos.map { placeKeyOf(it) }.distinct()
-                            val openViewer: () -> Unit = {
+                            val openQuick: () -> Unit = {
                                 if (node.photos.size == 1) {
-                                    // 单张：看大图，左右滑切换同一地点的全部照片
+                                    // 单张：快览卡从该张起步，左右滑切换同一地点的全部照片
                                     val key = placeKeyOf(node.photos[0])
                                     val group = points.filter { placeKeyOf(it) == key }
                                     val start = group.indexOfFirst { it.photo.id == node.photos[0].photo.id }.coerceAtLeast(0)
-                                    onOpenViewer(ViewerState(group.map { it.photo }, start))
+                                    quick = QuickView(group.map { it.photo }, start)
                                 } else {
-                                    onOpenViewer(ViewerState(node.photos.map { it.photo }, 0))
+                                    quick = QuickView(node.photos.map { it.photo }, 0)
                                 }
                             }
                             if (node.photos.size == 1 || distinctPlaces.size == 1 || map.zoomLevelDouble >= 17.0) {
-                                // 单点、或整组同一地点：直接看大图（同地点照片永远聚合在一起，
+                                // 单点、或整组同一地点：直接开快览卡（同地点照片永远聚合在一起，
                                 // 等缩放拆开是等不到的）；缩放很深仍聚合时也直接看
-                                openViewer()
+                                openQuick()
                             } else {
                                 // 聚合点混着多个地点：放大散开再挑
                                 map.controller.animateTo(GeoPoint(node.lat, node.lng))
@@ -662,10 +677,93 @@ private fun PhotoMap(geotagged: List<PhotoUi>, onOpenViewer: (ViewerState) -> Un
             map.invalidate()
         },
     )
+    // 快览卡（photo_gallery 两段式第一段：预览 + 左右切换，点预览图进全屏）
+    quick?.let { q ->
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF121713)),
+        ) {
+            Box(Modifier.fillMaxWidth().height(190.dp)) {
+                AsyncImage(
+                    model = java.io.File(q.photos[q.index].path),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable { onOpenViewer(ViewerState(q.photos, q.index)) },
+                    contentScale = ContentScale.Fit,
+                )
+                QuickNavBtn(
+                    "‹",
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(10.dp),
+                ) { quick = q.copy(index = (q.index - 1 + q.photos.size) % q.photos.size) }
+                QuickNavBtn(
+                    "›",
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(10.dp),
+                ) { quick = q.copy(index = (q.index + 1) % q.photos.size) }
+                Text(
+                    "✕",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .background(Color(0x66000000), CircleShape)
+                        .clickable { quick = null }
+                        .padding(7.dp),
+                )
+            }
+            val p = q.photos[q.index]
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    (p.placeName ?: "拍摄地点") + " · " +
+                        SimpleDateFormat("M 月 d 日", Locale.CHINESE).format(Date(p.date.toEpochDay() * 86400000L)),
+                    fontSize = 11.sp,
+                    color = Color(0xFFA8B3AC),
+                )
+                Text("${q.index + 1} / ${q.photos.size}", fontSize = 11.sp, color = Color(0xFFA8B3AC))
+            }
+        }
+    }
+    // 时光滑轨（photo_gallery 年份滑轨 × 原型 scrub：拖动看照片随时间生长）
+    Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
+        Slider(
+            value = shown.toFloat(),
+            onValueChange = { shown = it.toInt().coerceIn(1, ordered.size) },
+            valueRange = 1f..ordered.size.toFloat(),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("${ordered.first().photo.date.monthValue} 月 · 启程", fontSize = 10.5.sp, color = SubInk)
+            Text("${ordered.last().photo.date.monthValue} 月 · 今天", fontSize = 10.5.sp, color = SubInk)
+        }
+        Text(
+            "📍 时光滑轨：已亮起 $shown / ${ordered.size} 张 · 点气泡看大图 · 点地点进详情",
+            fontSize = 10.5.sp,
+            color = SubInk,
+            modifier = Modifier.padding(top = 2.dp),
+        )
+    }
     Spacer(Modifier.height(4.dp))
     val groups = remember(points) { groupPlaces(points) }
     groups.forEachIndexed { i, g ->
-        Column(Modifier.fillMaxWidth().padding(top = 13.dp)) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 13.dp)
+                .clickable(enabled = g.key == g.name) { onOpenPlace(g.name) },
+        ) {
             Text(
                 g.name,
                 fontSize = 22.sp,
@@ -673,7 +771,7 @@ private fun PhotoMap(geotagged: List<PhotoUi>, onOpenViewer: (ViewerState) -> Un
                 color = placeColors[i % placeColors.size],
             )
             Text(
-                "${g.days} 次到访 · ${g.photos} 张照片",
+                "${g.days} 次到访 · ${g.photos} 张照片" + if (g.key == g.name) " · 点击进入 ›" else "",
                 fontSize = 11.sp,
                 color = SubInk,
                 modifier = Modifier.padding(top = 2.dp),
@@ -685,5 +783,19 @@ private fun PhotoMap(geotagged: List<PhotoUi>, onOpenViewer: (ViewerState) -> Un
         "📍 照片按拍摄位置（EXIF）落点，仅存本地 · 缩小地图自动聚合 · 底图 © 高德地图",
         fontSize = 10.5.sp,
         color = SubInk,
+    )
+}
+
+/** 快览卡的圆形左右切换钮 */
+@Composable
+private fun QuickNavBtn(symbol: String, modifier: Modifier, onClick: () -> Unit) {
+    Text(
+        symbol,
+        color = Color.White,
+        fontSize = 18.sp,
+        modifier = modifier
+            .background(Color(0x99000000), CircleShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 5.dp),
     )
 }

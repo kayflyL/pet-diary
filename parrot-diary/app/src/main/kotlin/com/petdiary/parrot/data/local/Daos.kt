@@ -112,6 +112,17 @@ interface DiaryDao {
             "WHERE m.lat IS NOT NULL AND m.lng IS NOT NULL ORDER BY takenAt",
     )
     fun observeGeoNamed(): Flow<List<GeoMediaRow>>
+
+    /** 地点详情：全部带 GPS 媒体 + 地点名 + 关联日记文本/宠物，按时间升序 */
+    @Query(
+        "SELECT m.id AS id, m.path AS path, m.lat AS lat, m.lng AS lng, p.name AS placeName, " +
+            "COALESCE(m.takenAt, e.happenedAt) AS takenAt, m.entryId AS entryId, " +
+            "e.text AS entryText, e.petId AS petId, e.happenedAt AS happenedAt " +
+            "FROM diary_media m LEFT JOIN places p ON p.id = m.placeId " +
+            "LEFT JOIN diary_entries e ON e.id = m.entryId " +
+            "WHERE m.lat IS NOT NULL AND m.lng IS NOT NULL ORDER BY takenAt",
+    )
+    fun observePlaceMedia(): Flow<List<PlaceMediaRow>>
 }
 
 @Dao
@@ -167,6 +178,20 @@ data class GeoMediaRow(
     val lng: Double,
     val placeName: String?,
     val takenAt: Long?,
+)
+
+/** 地点详情查询行：媒体 + 地点名 + 关联日记/宠物 */
+data class PlaceMediaRow(
+    val id: String,
+    val path: String,
+    val lat: Double,
+    val lng: Double,
+    val placeName: String?,
+    val takenAt: Long?,
+    val entryId: String?,
+    val entryText: String?,
+    val petId: String?,
+    val happenedAt: Long?,
 )
 
 @Dao

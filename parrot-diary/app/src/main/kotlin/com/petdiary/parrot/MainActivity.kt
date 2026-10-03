@@ -37,6 +37,7 @@ import com.petdiary.parrot.feature.care.RemindersScreen
 import com.petdiary.parrot.feature.me.MeScreen
 import com.petdiary.parrot.feature.food.FoodLibScreen
 import com.petdiary.parrot.feature.memories.MemoriesScreen
+import com.petdiary.parrot.feature.memories.PlaceDetailScreen
 import com.petdiary.parrot.feature.pets.AddEditBirdScreen
 import com.petdiary.parrot.feature.pets.BirdDetailScreen
 import com.petdiary.parrot.feature.pets.BirdsScreen
@@ -129,7 +130,11 @@ fun AppNavHost(appearance: String, onCycleAppearance: () -> Unit) {
                     appearanceDark = appearance == "DARK",
                 )
             }
-            composable("memories") { MemoriesScreen() }
+            composable("memories") {
+                MemoriesScreen(
+                    onOpenPlace = { name -> nav.navigate("place/${android.net.Uri.encode(name)}") },
+                )
+            }
             composable("birds") {
                 BirdsScreen(
                     onBirdClick = { petId -> nav.navigate("bird/$petId") },
@@ -145,6 +150,12 @@ fun AppNavHost(appearance: String, onCycleAppearance: () -> Unit) {
                 )
             }
             composable("reminders") { RemindersScreen(onBack = { nav.popBackStack() }) }
+            composable(
+                route = "place/{name}",
+                arguments = listOf(navArgument("name") { type = NavType.StringType }),
+            ) {
+                PlaceDetailScreen(onBack = { nav.popBackStack() })
+            }
             composable("expenses") { ExpensesScreen(onBack = { nav.popBackStack() }) }
             composable(
                 route = "bird/edit?petId={petId}",

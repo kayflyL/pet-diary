@@ -282,6 +282,25 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
 .qp-nav.next{right:8px}
 .qp-x{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2}
 .qp-info{display:flex;justify-content:space-between;padding:6px 10px;font-size:10.5px;color:#A8B3AC;border-top:1px solid rgba(255,255,255,.08)}
+/* 全屏地图模式（⛶）：纸面地图铺满、滑轨浮层面板、围栏自动地名标签 */
+.fs-btn{position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:8px;background:rgba(16,19,18,.5);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;z-index:6}
+.fs-back{position:absolute;top:10px;left:10px;width:30px;height:30px;border-radius:50%;background:rgba(16,19,18,.55);color:#fff;font-size:14px;cursor:pointer;z-index:7;display:none;align-items:center;justify-content:center}
+.fs-stats{position:absolute;top:12px;right:12px;background:rgba(16,19,18,.72);color:#fff;font-size:10.5px;padding:4px 10px;border-radius:999px;z-index:6;display:none}
+.ptag{position:absolute;transform:translate(-50%,0);font-size:9.5px;background:rgba(16,19,18,.75);color:#fff;padding:1px 7px;border-radius:6px;z-index:3;display:none;white-space:nowrap}
+#m-map.map-fs{position:fixed;inset:0;z-index:800;background:#EFEBE2;padding:10px 10px 0;display:flex;flex-direction:column}
+#m-map.map-fs .papermap{flex:1;height:auto;border-radius:14px}
+#m-map.map-fs .fs-back{display:flex}
+#m-map.map-fs .fs-stats{display:block}
+#m-map.map-fs .ptag{display:block}
+#m-map.map-fs .fs-slider{display:block}
+.fs-slider{display:none;margin:10px 2px;background:rgba(16,19,18,.85);border-radius:12px;padding:8px 14px 6px;color:#fff}
+.fs-slider .sl-label{font-size:11px;text-align:center;margin-bottom:2px}
+.fs-slider input[type=range]{width:100%;accent-color:#2F8F5B}
+.fs-slider .sl-ticks{display:flex;justify-content:space-between;font-size:9px;color:#A8B3AC}
+/* 全屏大图：点击缩放、拖拽平移 */
+.pv-img{transition:transform .18s ease}
+.pv-img.zoomed{cursor:grab}
+.pv .pcap .pv-gps{font-size:10px;opacity:.55;margin-top:2px}
 .pllist{margin-top:6px}
 .pllist .pl{display:block;font-size:22px;font-weight:800;letter-spacing:-.3px;margin:13px 2px;cursor:pointer;line-height:1.15}
 .pllist .pl:hover{opacity:.75}
@@ -440,11 +459,18 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
   <div id="m-map" class="hidden">
     <div class="papermap" onclick="qpClose()">
       <div class="park"></div><div class="water"></div>
+      <span class="fs-back" onclick="event.stopPropagation();mapFs(false)">←</span>
+      <span class="fs-stats">📍 9 张有位置信息 · 3 个地方</span>
       <span class="pcl" style="left:76%;top:26%;background:linear-gradient(140deg,#CBE5D6,#5FA97E)" onclick="event.stopPropagation();qpOpen('park',this)">🌳<span class="n">12</span></span>
       <span class="pcl" style="left:50%;top:56%;background:linear-gradient(140deg,#DCEEE2,#9CCDB0)" onclick="event.stopPropagation();qpOpen('home',this)">🦜<span class="n">86</span></span>
       <span class="pcl" style="left:22%;top:76%;background:linear-gradient(140deg,#FFE9BE,#F0C25F)" onclick="event.stopPropagation();qpOpen('grandma',this)">🏡<span class="n">5</span></span>
       <span class="pcl" style="left:30%;top:33%;width:34px;height:34px;font-size:17px;border-width:2px;background:linear-gradient(140deg,#D4E5F7,#8FB3D9)" onclick="event.stopPropagation();qpOpen('vet',this)">🏥</span>
+      <span class="ptag" style="left:76%;top:38%">人民公园</span>
+      <span class="ptag" style="left:50%;top:68%">家</span>
+      <span class="ptag" style="left:22%;top:88%">外婆家</span>
+      <span class="ptag" style="left:30%;top:45%">安安异宠医院</span>
       <span class="zoomnote">缩小地图 · 相近照片自动聚合成气泡 · 点气泡弹快览卡</span>
+      <span class="fs-btn" onclick="event.stopPropagation();mapFs(true)" title="全屏地图">⛶</span>
       <div class="qp" id="qp" onclick="event.stopPropagation()">
         <span class="qp-x" onclick="event.stopPropagation();qpClose()">✕</span>
         <div class="qp-img" id="qp-img" onclick="event.stopPropagation();pvOpen(qpK,qpI)" title="点击查看大图"></div>
@@ -452,6 +478,11 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
         <button class="qp-nav next" onclick="event.stopPropagation();qpMove(1)">›</button>
         <div class="qp-info"><span id="qp-meta"></span><span id="qp-idx"></span></div>
       </div>
+    </div>
+    <div class="fs-slider">
+      <div class="sl-label" id="fs-label">📅 全部时间 · 9 张</div>
+      <input type="range" min="0" max="9" value="9" oninput="fsSlide(this.value)">
+      <div class="sl-ticks"><span>2025-12</span><span>2026-04</span><span>2026-06</span><span>2026-08</span><span>2026-09</span><span>2026-10</span></div>
     </div>
     <div class="mquote" style="margin-top:14px">“你在公园的一天，可以变成更深层的故事：告诉人们那张照片是在哪里拍的。” <b>—— 位置就是情感元数据</b></div>
     <div class="pllist">
@@ -461,7 +492,7 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
       <span class="pl c1">安安异宠医院<small>2025 年 · 2 张照片</small></span>
       <span class="pl c2">家 · 大本营<small>每一天 · 86 张照片</small></span>
     </div>
-    <div class="refnote">📍 位置来自照片 EXIF，仅存本地 · 点气泡全屏看大图，左右切换同一地点的照片 · 底图为纸面示意，正式版接高德</div>
+    <div class="refnote">📍 位置来自照片 EXIF，仅存本地 · ⛶ 进全屏地图（滑轨按时间生长、围栏自动标地名）· 点气泡弹快览卡，点预览进全屏大图（点击缩放/拖拽平移）· 底图为纸面示意，正式版接高德</div>
   </div>
 
   <div id="m-photo" class="hidden">
@@ -646,10 +677,10 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
 
 <!-- ════════ 照片地图 · 大图查看器 ════════ -->
 <div class="pv" id="pv" onclick="pvClose()">
-  <div class="pcap"><b id="pv-name"></b><small id="pv-meta"></small></div>
+  <div class="pcap"><b id="pv-name"></b><small id="pv-meta"></small><small class="pv-gps" id="pv-gps"></small></div>
   <span class="pcls" onclick="event.stopPropagation();pvClose()">✕</span>
   <div class="pstage">
-    <div class="pimg" id="pv-img" onclick="event.stopPropagation()"></div>
+    <div class="pimg" id="pv-img" onclick="event.stopPropagation();pvToggleZoom(event)" title="点击缩放，放大后拖拽平移"></div>
     <span class="parr" id="pv-prev" style="left:12px" onclick="event.stopPropagation();pvMove(-1)">‹</span>
     <span class="parr" id="pv-next" style="right:12px" onclick="event.stopPropagation();pvMove(1)">›</span>
   </div>
@@ -766,10 +797,10 @@ function pick(label,count){const list=document.getElementById('day-list');
    (count>0?[1,2].slice(0,Math.min(count,2)).map((n,i)=>`<div class="tl-item"><div class="tl-ico"><svg class="ic"><use href="#i-pen"/></svg></div><div class="tl-body"><b style="font-size:13.5px">记录 ${i+1}（原型示意）</b><div class="tl-time">点开看详情</div></div></div>`).join('')
    :`<div class="card" style="text-align:center;color:var(--sub);font-size:13px">这天没有记录 <span style="color:var(--pri);font-weight:700;cursor:pointer" onclick="toast('补记：日期已选为当天')">＋ 补记</span></div>`);}
 const PVDATA={
- home:{name:'家',photos:[{e:'🦜',g:'linear-gradient(140deg,#CBE5D6,#5FA97E)',t:'2026-10-02 09:12'},{e:'🌿',g:'linear-gradient(140deg,#DCEEE2,#9CCDB0)',t:'2026-10-02 15:40'},{e:'☀️',g:'linear-gradient(140deg,#E3F0E6,#BFDCC9)',t:'2026-09-30 11:05'}]},
- park:{name:'人民公园',photos:[{e:'🌳',g:'linear-gradient(140deg,#CBE5D6,#5FA97E)',t:'2026-10-01 14:02'},{e:'🎵',g:'linear-gradient(140deg,#D4E5F7,#8FB3D9)',t:'2026-09-21 10:33'},{e:'🌸',g:'linear-gradient(140deg,#F6D6E0,#EFB3C8)',t:'2026-08-30 16:20'}]},
- grandma:{name:'外婆家',photos:[{e:'🏡',g:'linear-gradient(140deg,#FFE9BE,#F0C25F)',t:'2026-09-28 12:10'},{e:'🥧',g:'linear-gradient(140deg,#FFE9BE,#F0C25F)',t:'2026-08-15 18:45'}]},
- vet:{name:'安安异宠医院',photos:[{e:'🏥',g:'linear-gradient(140deg,#D4E5F7,#8FB3D9)',t:'2025-12-14 10:00'}]}
+ home:{name:'家',gps:'121.4737, 31.2304',photos:[{e:'🦜',g:'linear-gradient(140deg,#CBE5D6,#5FA97E)',t:'2026-10-02 09:12'},{e:'🌿',g:'linear-gradient(140deg,#DCEEE2,#9CCDB0)',t:'2026-10-02 15:40'},{e:'☀️',g:'linear-gradient(140deg,#E3F0E6,#BFDCC9)',t:'2026-09-30 11:05'}]},
+ park:{name:'人民公园',gps:'121.4800, 31.2250',photos:[{e:'🌳',g:'linear-gradient(140deg,#CBE5D6,#5FA97E)',t:'2026-10-01 14:02'},{e:'🎵',g:'linear-gradient(140deg,#D4E5F7,#8FB3D9)',t:'2026-09-21 10:33'},{e:'🌸',g:'linear-gradient(140deg,#F6D6E0,#EFB3C8)',t:'2026-08-30 16:20'}]},
+ grandma:{name:'外婆家',gps:'120.9800, 30.9500',photos:[{e:'🏡',g:'linear-gradient(140deg,#FFE9BE,#F0C25F)',t:'2026-09-28 12:10'},{e:'🥧',g:'linear-gradient(140deg,#FFE9BE,#F0C25F)',t:'2026-08-15 18:45'}]},
+ vet:{name:'安安异宠医院',gps:'121.4500, 31.2800',photos:[{e:'🏥',g:'linear-gradient(140deg,#D4E5F7,#8FB3D9)',t:'2025-12-14 10:00'}]}
 };
 let pvK='home',pvI=0;
 function pvOpen(k,i){pvK=k;pvI=i||0;document.getElementById('pv').classList.add('show');pvRender();}
@@ -777,6 +808,7 @@ function pvRender(){const pl=PVDATA[pvK];const p=pl.photos[pvI];
  document.getElementById('pv-img').style.background=p.g;document.getElementById('pv-img').textContent=p.e;
  document.getElementById('pv-name').textContent=pl.name;
  document.getElementById('pv-meta').textContent=p.t+' · '+(pvI+1)+'/'+pl.photos.length;
+document.getElementById('pv-gps').textContent='📍 '+pl.gps;
  document.getElementById('pv-prev').style.visibility=pvI>0?'visible':'hidden';
  document.getElementById('pv-next').style.visibility=pvI<pl.photos.length-1?'visible':'hidden';}
 function pvMove(d){pvI=Math.max(0,Math.min(PVDATA[pvK].photos.length-1,pvI+d));pvRender();}
@@ -797,6 +829,21 @@ function qpRender(){const pl=PVDATA[qpK];const p=pl.photos[qpI];
  document.getElementById('qp-idx').textContent=(qpI+1)+' / '+pl.photos.length;}
 function qpMove(d){qpI=(qpI+d+PVDATA[qpK].photos.length)%PVDATA[qpK].photos.length;qpRender();}
 function qpClose(){document.getElementById('qp').classList.remove('show');}
+function mapFs(on){document.getElementById('m-map').classList.toggle('map-fs',on);qpClose();}
+function fsSlide(v){v=+v;const show={vet:v>=1,grandma:v>=2,park:v>=4,home:v>=7};
+ document.querySelectorAll('#m-map .pcl').forEach(el=>{const m=el.getAttribute('onclick').match(/qpOpen\('(\w+)'/);if(m)el.style.display=show[m[1]]?'flex':'none';});
+ document.getElementById('fs-label').textContent=v>=9?'📅 全部时间 · 9 张':v>=4?'📅 至 2026-09 · 6 张':v>=2?'📅 至 2026-08 · 3 张':'📅 至 2025-12 · 1 张';
+ if(qpK&&!show[qpK])qpClose();}
+let pvZ=1,pvTx=0,pvTy=0,pvDown=false,pvSX=0,pvSY=0;
+function pvToggleZoom(e){const img=document.getElementById('pv-img');
+ pvZ=pvZ>1?1:2.1;
+ if(pvZ>1&&e){const r=img.getBoundingClientRect();img.style.transformOrigin=((e.clientX-r.left)/r.width*100).toFixed(0)+'% '+((e.clientY-r.top)/r.height*100).toFixed(0)+'%';pvTx=0;pvTy=0;img.style.transform='scale(2.1)';}
+ else{img.style.transformOrigin='center center';img.style.transform='';}
+ img.classList.toggle('zoomed',pvZ>1);}
+(function(){const img=document.getElementById('pv-img');
+ img.addEventListener('mousedown',e=>{if(pvZ>1){pvDown=true;pvSX=e.clientX-pvTx;pvSY=e.clientY-pvTy;e.stopPropagation();}});
+ window.addEventListener('mousemove',e=>{if(pvDown){pvTx=e.clientX-pvSX;pvTy=e.clientY-pvSY;img.style.transform='scale(2.1) translate('+pvTx+'px,'+pvTy+'px)';}});
+ window.addEventListener('mouseup',()=>{pvDown=false;});})();
 (function(){const g=document.getElementById('yeargrid');const names=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
  for(let m=0;m<12;m++){const row=document.createElement('div');row.className='yr';
   const lb=document.createElement('span');lb.className='yl';lb.textContent=names[m];row.appendChild(lb);

@@ -245,9 +245,12 @@ private fun StoryWall(stories: List<StoryUi>, scrollState: ScrollState) {
         val firstOfMonth = remember(stories) {
             stories.groupBy { it.date.withDayOfMonth(1) }.mapValues { (_, v) -> v.first().date }
         }
-        Row(Modifier.weight(1f).padding(start = 10.dp)) {
+        Row(
+            Modifier.weight(1f).padding(start = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             columns.forEach { col ->
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     col.forEach { story ->
                         val ratio = ratios[(stories.indexOf(story)) % ratios.size]
                         StoryTile(

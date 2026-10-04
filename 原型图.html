@@ -24,7 +24,9 @@ body{background:#141618;font-family:-apple-system,'MiSans','HarmonyOS Sans SC','
 .screen{position:absolute;inset:0;overflow-y:auto;padding:18px 18px 128px;display:none;scrollbar-width:none}
 .screen.active{display:block;animation:fadein .18s ease-out}
 #s-mem.active{display:flex;flex-direction:column}
-#m-map{flex:none;height:calc(100vh - 148px);display:flex;flex-direction:column;margin:-18px -18px 0}
+/* 地图页签：整段不滚动，地图弹性填充、滑轨常驻屏内 */
+#s-mem.active:has(#m-map:not(.hidden)){overflow:hidden}
+#m-map{flex:1;min-height:0;display:flex;flex-direction:column;margin:-18px -18px 0}
 #m-map .papermap{flex:1;height:auto;border:none;border-radius:0}
 #m-map .fs-slider{margin:0 12px 132px}
 .places-chip{position:absolute;top:12px;left:12px;background:rgba(16,19,18,.72);color:#fff;font-size:10.5px;padding:4px 10px;border-radius:999px;z-index:6;cursor:pointer}

@@ -14,6 +14,7 @@ import android.graphics.drawable.Drawable
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -614,7 +615,7 @@ internal fun PhotoViewer(state: ViewerState, onDismiss: () -> Unit) {
 }
 
 /** 快览卡状态：某组照片 + 当前张（点预览图进全屏查看器）——移植自用户 photo_gallery 的聚合弹窗 */
-private data class QuickView(val photos: List<PhotoUi>, val index: Int)
+private data class QuickView(val photos: List<PhotoUi>, val index: Int, val anchorLat: Double, val anchorLng: Double)
 
 /**
  * 照片地图（原型 v3.6 对齐）：点「地图」页签直接看到铺满的地图。
@@ -647,6 +648,7 @@ private fun PhotoMap(
     var shown by remember { mutableIntStateOf(ordered.size) }
     val points = remember(ordered, shown) { ordered.take(shown) }
     var quick by remember { mutableStateOf<QuickView?>(null) }
+    var bubbleTick by remember { mutableIntStateOf(0) }
     val ctx = LocalContext.current
     var clusterTick by remember { mutableIntStateOf(0) }
     val mapRadiusPx = 18f * ctx.resources.displayMetrics.density
@@ -670,9 +672,14 @@ private fun PhotoMap(
             }
             addMapListener(
                 object : MapListener {
-                    override fun onScroll(event: ScrollEvent?): Boolean = false
+                    override fun onScroll(event: ScrollEvent?): Boolean {
+                        if (quick != null) bubbleTick++ // 快览跟随地图移动
+                        return false
+                    }
+
                     override fun onZoom(event: ZoomEvent?): Boolean {
                         clusterTick++
+                        if (quick != null) bubbleTick++
                         return false
                     }
                 },
@@ -683,7 +690,13 @@ private fun PhotoMap(
     val tick = clusterTick
     Column(modifier.fillMaxWidth()) {
         // 地图区：浮层都"长在地图上"（对齐原型 v3.6）
-        Box(Modifier.fillMaxWidth().weight(1f)) {
+        var boxSize by remember { mutableStateOf(android.util.Size(0, 0)) }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .onGloballyPositioned { boxSize = android.util.Size(it.size.width, it.size.height) },
+        ) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { c ->
@@ -728,9 +741,9 @@ private fun PhotoMap(
                                         val key = placeKeyOf(node.photos[0])
                                         val group = points.filter { placeKeyOf(it) == key }
                                         val start = group.indexOfFirst { it.photo.id == node.photos[0].photo.id }.coerceAtLeast(0)
-                                        quick = QuickView(group.map { it.photo }, start)
+                                        quick = QuickView(group.map { it.photo }, start, node.lat, node.lng)
                                     } else {
-                                        quick = QuickView(node.photos.map { it.photo }, 0)
+                                        quick = QuickView(node.photos.map { it.photo }, 0, node.lat, node.lng)
                                     }
                                     true
                                 }
@@ -785,16 +798,51 @@ private fun PhotoMap(
                     .background(Color(0xFFE7EEE7), RoundedCornerShape(8.dp))
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             )
-            // 快览浮层（两段式第一段：预览 + 左右切换，点预览图进全屏）
+            // 快览浮层（两段式第一段）：锚定在被点圆点上，随地图平移/缩放实时跟随（原型 Leaflet popup 行为）
             quick?.let { q ->
+                val anchor = runCatching {
+                    mapView.projection.toPixels(GeoPoint(q.anchorLat, q.anchorLng), null)
+                }.getOrNull()
+                var cardSize by remember { mutableStateOf(android.util.Size(0, 0)) }
+                val cardW = cardSize.width
+                val cardH = cardSize.height
+                val boxW = boxSize.width
+                val boxH = boxSize.height
+                val above = anchor != null && anchor.y > boxH / 2
+                val x = if (anchor != null && boxW > 0 && cardW > 0) {
+                    (anchor.x - cardW / 2).coerceIn(6, (boxW - cardW - 6).coerceAtLeast(6))
+                } else ((boxW - cardW) / 2).coerceAtLeast(6)
+                val y = if (anchor != null && boxH > 0 && cardH > 0) {
+                    if (above) (anchor.y - cardH - 12) else (anchor.y + 16)
+                } else ((boxH - cardH - 12).coerceAtLeast(12))
                 Column(
                     Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(10.dp)
+                        .offset { IntOffset(x.toInt(), y.toInt()) }
+                        .width(300.dp)
+                        .onGloballyPositioned { cardSize = android.util.Size(it.size.width, it.size.height) }
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xF2101412)),
                 ) {
+                    // 尖角：指向圆点
+                    if (anchor != null && cardW > 0) {
+                        val tipX = (anchor.x - x).coerceIn(18, (cardW - 34).coerceAtLeast(18))
+                        val tipY = if (above) cardH - 2 else -7
+                        Canvas(
+                            Modifier
+                                .offset { IntOffset(tipX, tipY) }
+                                .size(16.dp, 9.dp),
+                        ) {
+                            val path = androidx.compose.ui.graphics.Path().apply {
+                                if (above) {
+                                    moveTo(0f, 0f); lineTo(size.width.toFloat(), 0f); lineTo(size.width.toFloat() / 2f, size.height.toFloat())
+                                } else {
+                                    moveTo(0f, size.height.toFloat()); lineTo(size.width.toFloat(), size.height.toFloat()); lineTo(size.width.toFloat() / 2f, 0f)
+                                }
+                                close()
+                            }
+                            drawPath(path, Color(0xF2101412))
+                        }
+                    }
                     Box(Modifier.fillMaxWidth().height(170.dp)) {
                         AsyncImage(
                             model = java.io.File(q.photos[q.index].path),
@@ -846,7 +894,7 @@ private fun PhotoMap(
                 }
             }
         }
-        // 时光滑轨面板（原型 .ts-panel：纸白磨砂 + 大日期实时跳动 + 照片分布点）
+        // 时光滑轨面板（原型 .ts-panel：纸白磨砂 + 大日期实时跳动 + 照片分布点）        // 时光滑轨面板（原型 .ts-panel：纸白磨砂 + 大日期实时跳动 + 照片分布点）
         val nums = remember(ordered) { ordered.map { it.photo.takenAt ?: (it.photo.date.toEpochDay() * 86400000L) } }
         val minN = nums.first()
         val maxN = nums.last()

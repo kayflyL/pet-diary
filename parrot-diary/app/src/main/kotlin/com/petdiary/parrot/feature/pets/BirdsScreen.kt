@@ -15,7 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
+import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.ChevronRight
@@ -105,11 +108,21 @@ private fun BirdRow(pet: PetEntity, today: Long, onClick: () -> Unit) {
             Box(
                 modifier = Modifier
                     .size(48.dp)
+                    .clip(CircleShape)
                     .background(ui.accent.copy(alpha = 0.18f), CircleShape)
                     .border(2.dp, ui.accent, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(text = pet.name.take(1), fontWeight = FontWeight.Bold, color = ui.accent)
+                if (pet.avatarPath != null) {
+                    AsyncImage(
+                        model = java.io.File(pet.avatarPath),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Text(text = pet.name.take(1), fontWeight = FontWeight.Bold, color = ui.accent)
+                }
             }
             Column(modifier = Modifier.weight(1f).padding(start = 13.dp)) {
                 Text(pet.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

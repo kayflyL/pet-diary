@@ -40,6 +40,7 @@ import com.petdiary.parrot.feature.memories.PlaceDetailScreen
 import com.petdiary.parrot.feature.memories.PlacesScreen
 import com.petdiary.parrot.feature.pets.AddEditBirdScreen
 import com.petdiary.parrot.feature.pets.BirdDetailScreen
+import com.petdiary.parrot.feature.pets.AvatarCropScreen
 import com.petdiary.parrot.feature.pets.BirdsScreen
 import com.petdiary.parrot.feature.today.TodayScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -168,10 +169,17 @@ fun AppNavHost(appearance: String, onCycleAppearance: () -> Unit) {
             ) {
                 AddEditBirdScreen(onDone = { nav.popBackStack() })
             }
+            composable(
+                route = "bird/avatar/{petId}",
+                arguments = listOf(navArgument("petId") { type = NavType.StringType }),
+            ) {
+                AvatarCropScreen(onDone = { nav.popBackStack() })
+            }
             composable("bird/{petId}") { entry ->
                 val petId = entry.arguments?.getString("petId").orEmpty()
                 BirdDetailScreen(
                     onEdit = { nav.navigate("bird/edit?petId=$petId") },
+                    onSetAvatar = { nav.navigate("bird/avatar/$petId") },
                     onBack = { nav.popBackStack() },
                     onOpenFoodLib = { nav.navigate("food/$petId") },
                 )

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Edit
@@ -33,6 +34,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.petdiary.parrot.core.util.AgeFormatter
 import java.time.LocalDate
@@ -43,6 +46,7 @@ fun BirdDetailScreen(
     onEdit: () -> Unit,
     onBack: () -> Unit,
     onOpenFoodLib: (String) -> Unit = {},
+    onSetAvatar: () -> Unit = {},
     vm: BirdDetailViewModel = hiltViewModel(),
 ) {
     val pet by vm.bird.collectAsState()
@@ -79,10 +83,23 @@ fun BirdDetailScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Box(
-                    modifier = Modifier.size(62.dp).background(ui.accent, CircleShape),
+                    modifier = Modifier
+                        .size(62.dp)
+                        .clip(CircleShape)
+                        .background(ui.accent, CircleShape)
+                        .clickable(enabled = onSetAvatar != {}) { onSetAvatar() },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(ui.initial, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                    if (pet?.avatarPath != null) {
+                        AsyncImage(
+                            model = java.io.File(pet!!.avatarPath),
+                            contentDescription = "换头像",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                    } else {
+                        Text(ui.initial, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                    }
                 }
                 Column {
                     Text(ui.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)

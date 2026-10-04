@@ -252,6 +252,7 @@ private fun HeroCard(
     onSelect: (String) -> Unit,
     onOpenDetail: () -> Unit,
 ) {
+    val bgPhoto = birds.firstOrNull { it.id == ui.selectedBirdId }?.avatarPath ?: photoPath
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -260,10 +261,10 @@ private fun HeroCard(
             .background(Color(0xFF123A2C))
             .clickable(onClick = onOpenDetail),
     ) {
-        // 第二层：这只鸟最新的一张照片
-        if (photoPath != null) {
+        // 第二层：这只鸟的头像照片（未设置时退回最新日记照片）
+        if (bgPhoto != null) {
             AsyncImage(
-                model = java.io.File(photoPath),
+                model = java.io.File(bgPhoto),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
@@ -287,11 +288,21 @@ private fun HeroCard(
                 Box(
                     modifier = Modifier
                         .size(38.dp)
+                        .clip(CircleShape)
                         .background(if (selected) Color.White else Color.White.copy(alpha = 0.18f), CircleShape)
                         .clickable { onSelect(b.id) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(b.name.take(1), fontWeight = FontWeight.Bold, color = Color(0xFF1D5C3E))
+                    if (b.avatarPath != null) {
+                        AsyncImage(
+                            model = java.io.File(b.avatarPath),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                    } else {
+                        Text(b.name.take(1), fontWeight = FontWeight.Bold, color = Color(0xFF1D5C3E))
+                    }
                 }
             }
         }

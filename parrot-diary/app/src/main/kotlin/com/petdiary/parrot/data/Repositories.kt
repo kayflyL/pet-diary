@@ -112,6 +112,9 @@ class FoodRepository @Inject constructor(
 
 @Singleton
 class PetRepository @Inject constructor(private val petDao: PetDao) {
+    suspend fun setAvatar(petId: String, path: String) {
+        petDao.getById(petId)?.let { petDao.upsert(it.copy(avatarPath = path)) }
+    }
     fun observeActive(): Flow<List<PetEntity>> = petDao.observeActive()
     fun observeById(id: String): Flow<PetEntity?> = petDao.observeById(id)
     suspend fun getById(id: String): PetEntity? = petDao.getById(id)

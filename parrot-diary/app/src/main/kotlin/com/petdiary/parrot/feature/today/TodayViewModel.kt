@@ -125,6 +125,16 @@ class TodayViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** 英雄卡背景：该鸟最新一张日记照片（无照片时为空，退回纯色渐变） */
+    val heroPhotoPath: StateFlow<String?> = selectedBird
+        .flatMapLatest { pet ->
+            pet?.let { diaryRepository.observeMediaForPet(it.id) } ?: flowOf(emptyList())
+        }
+        .map { list ->
+            list.maxByOrNull { it.takenAt ?: it.createdAt }?.path
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     fun selectBird(id: String) {
         selectedBirdId.value = id
     }

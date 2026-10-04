@@ -50,8 +50,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -60,6 +62,7 @@ import androidx.compose.ui.platform.LocalContext
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
+import coil3.compose.AsyncImage
 import androidx.hilt.navigation.compose.hiltViewModel
 
 import com.petdiary.parrot.core.designsystem.BirdAccents
@@ -80,6 +83,7 @@ fun TodayScreen(
     val ui by vm.todayUi(today).collectAsState()
     val favoriteFoods by vm.favoriteFoods.collectAsState()
     val allFoods by vm.allFoods.collectAsState()
+    val heroPhotoPath by vm.heroPhotoPath.collectAsState()
     var sheet by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState()
     val context = LocalContext.current
@@ -145,7 +149,7 @@ fun TodayScreen(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             ) {
-                item { HeroCard(ui, ui.birds, vm::selectBird) { onBirdClick(ui.selectedBirdId ?: return@HeroCard) } }
+                item { HeroCard(ui, ui.birds, heroPhotoPath, vm::selectBird) { onBirdClick(ui.selectedBirdId ?: return@HeroCard) } }
                 item { Spacer(Modifier.height(10.dp)) }
                 item {
                     WeekCard(
@@ -244,6 +248,7 @@ fun TodayScreen(
 private fun HeroCard(
     ui: TodayUi,
     birds: List<com.petdiary.parrot.data.local.PetEntity>,
+    photoPath: String?,
     onSelect: (String) -> Unit,
     onOpenDetail: () -> Unit,
 ) {
@@ -251,18 +256,30 @@ private fun HeroCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(206.dp)
-            .background(
-                Brush.linearGradient(listOf(Color(0xFF123A2C), Color(0xFF1D5C3E))),
-                RoundedCornerShape(24.dp),
-            )
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color(0xFF123A2C))
             .clickable(onClick = onOpenDetail),
     ) {
-        Text(
-            ui.initial,
-            fontSize = 104.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = Color.White.copy(alpha = 0.08f),
-            modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 0.dp, end = 10.dp),
+        // 第二层：这只鸟最新的一张照片
+        if (photoPath != null) {
+            AsyncImage(
+                model = java.io.File(photoPath),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        }
+        // 顶层渐变：上深下透明再转深，保证头像与文字可读
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color(0xFF123A2C).copy(alpha = 0.72f),
+                        0.42f to Color.Transparent,
+                        1f to Color(0xFF0D2B1F).copy(alpha = 0.94f),
+                    ),
+                ),
         )
         Row(modifier = Modifier.align(Alignment.TopEnd).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             birds.forEach { b ->

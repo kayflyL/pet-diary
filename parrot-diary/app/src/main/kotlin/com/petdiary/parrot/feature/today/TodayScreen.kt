@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,6 +46,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -56,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
@@ -152,7 +155,7 @@ fun TodayScreen(
                 item { HeroCard(ui, ui.birds, heroPhotoPath, vm::selectBird) { onBirdClick(ui.selectedBirdId ?: return@HeroCard) } }
                 item { Spacer(Modifier.height(10.dp)) }
                 item {
-                    WeekCard(
+                    CalendarCard(
                         ui = ui,
                         onPrev = { vm.shiftWeek(-1) },
                         onNext = { vm.shiftWeek(1) },
@@ -337,15 +340,17 @@ private fun GlassStat(value: String, label: String) {
     }
 }
 
-/** 周历卡（原型 .cal-head/.week/.legend）：周导航 + 可点日格 + 本月汇总 */
+/** 日历卡（原型 .cal-head/.week/.cal-month/.cal-year/.legend）：周/月/年 三模式切换 + 热力 */
 @Composable
-private fun WeekCard(
+private fun CalendarCard(
     ui: TodayUi,
     onPrev: () -> Unit,
     onNext: () -> Unit,
     onToday: () -> Unit,
     onPickDay: (LocalDate) -> Unit,
 ) {
+    var mode by remember { mutableIntStateOf(0) } // 0=周 1=月 2=年
+    val today = LocalDate.now()
     Column(
         Modifier
             .fillMaxWidth()
@@ -353,61 +358,42 @@ private fun WeekCard(
             .padding(14.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("本周 · ${ui.weekRecordCount} 笔", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(
+                when (mode) {
+                    0 -> when {
+                        ui.weekOffset == 0 -> "本周 · ${ui.weekRecordCount} 笔"
+                        ui.weekOffset < 0 -> "${-ui.weekOffset} 周前 · ${ui.weekRecordCount} 笔"
+                        else -> "${ui.weekOffset} 周后 · ${ui.weekRecordCount} 笔"
+                    }
+                    1 -> "${today.year} 年 ${today.monthValue} 月 · ${ui.monthCounts.values.sum()} 笔"
+                    else -> "${today.year} 年 · ${ui.yearCounts.values.sum()} 笔"
+                },
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                NavChip("‹", onPrev)
-                NavChip("今天", onToday)
-                NavChip("›", onNext)
+                if (mode == 0) {
+                    NavChip("‹", onPrev)
+                    NavChip("今天", onToday)
+                    NavChip("›", onNext)
+                }
+                NavChip(if (mode == 2) "周" else if (mode == 1) "年" else "月") { mode = (mode + 1) % 3 }
             }
         }
         Spacer(Modifier.height(10.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            ui.weekDays.forEach { d ->
-                val c = ui.weekCounts[d] ?: 0
-                val isToday = d == LocalDate.now()
-                val isSel = d == ui.selectedDay
-                val bg = when {
-                    c >= 3 -> MaterialTheme.colorScheme.primary
-                    c == 2 -> Color(0xFFBFE0CD)
-                    c == 1 -> MaterialTheme.colorScheme.primaryContainer
-                    else -> MaterialTheme.colorScheme.surfaceVariant
-                }
-                val content = if (c >= 3) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(bg, RoundedCornerShape(13.dp))
-                        .then(
-                            when {
-                                isSel -> Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(13.dp))
-                                isToday -> Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(13.dp))
-                                else -> Modifier
-                            },
-                        )
-                        .clickable { onPickDay(d) }
-                        .padding(vertical = 9.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            "${d.dayOfMonth}",
-                            fontSize = 13.sp,
-                            fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.SemiBold,
-                            color = content,
-                        )
-                        Text(
-                            d.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.CHINESE),
-                            fontSize = 9.5.sp,
-                            color = content.copy(alpha = 0.65f),
-                        )
-                    }
-                }
-            }
+        when (mode) {
+            0 -> WeekStrip(ui, onPickDay)
+            1 -> MonthGrid(today.withDayOfMonth(1), ui.monthCounts, ui.selectedDay, onPickDay)
+            else -> YearHeatmap(today.year, ui.yearCounts)
         }
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth()) {
             Text(
-                "本月 ${ui.monthActiveDays} 天 · ${ui.monthRecords} 笔",
+                when (mode) {
+                    0 -> "本月 ${ui.monthActiveDays} 天 · ${ui.monthRecords} 笔"
+                    1 -> "本月 ${ui.monthCounts.values.count { it > 0 }} 天 · ${ui.monthCounts.values.sum()} 笔"
+                    else -> "全年 ${ui.yearCounts.values.count { it > 0 }} 天"
+                },
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
@@ -423,6 +409,156 @@ private fun WeekCard(
                     Box(Modifier.size(9.dp).background(c, CircleShape))
                 }
                 Text("多", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+/** 周条（原型 .week）：七格热力 + 今日描边 + 点选切换日期 */
+@Composable
+private fun WeekStrip(ui: TodayUi, onPickDay: (LocalDate) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        ui.weekDays.forEach { d ->
+            val c = ui.weekCounts[d] ?: 0
+            val isToday = d == LocalDate.now()
+            val isSel = d == ui.selectedDay
+            val bg = heatColor(c)
+            val content = if (c >= 3) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(bg, RoundedCornerShape(13.dp))
+                    .then(
+                        when {
+                            isSel -> Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(13.dp))
+                            isToday -> Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(13.dp))
+                            else -> Modifier
+                        },
+                    )
+                    .clickable { onPickDay(d) }
+                    .padding(vertical = 9.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "${d.dayOfMonth}",
+                        fontSize = 13.sp,
+                        fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.SemiBold,
+                        color = content,
+                    )
+                    Text(
+                        d.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.CHINESE),
+                        fontSize = 9.5.sp,
+                        color = content.copy(alpha = 0.65f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 热力色阶（少 → 多） */
+@Composable
+private fun heatColor(c: Int) = when {
+    c >= 3 -> MaterialTheme.colorScheme.primary
+    c == 2 -> Color(0xFFBFE0CD)
+    c == 1 -> MaterialTheme.colorScheme.primaryContainer
+    else -> MaterialTheme.colorScheme.surfaceVariant
+}
+
+/** 月历（原型 .cal-month/.mgrid）：整月逐日热力，点格切到那天 */
+@Composable
+private fun MonthGrid(
+    month: LocalDate,
+    counts: Map<LocalDate, Int>,
+    selected: LocalDate,
+    onPick: (LocalDate) -> Unit,
+) {
+    val today = LocalDate.now()
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth()) {
+            listOf("一", "二", "三", "四", "五", "六", "日").forEach { wd ->
+                Text(
+                    wd,
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+        val lead = month.dayOfWeek.value - 1 // 周一=1 → 月首前导空格数
+        val daysInMonth = month.lengthOfMonth()
+        val rows = (lead + daysInMonth + 6) / 7
+        for (r in 0 until rows) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                for (c in 0 until 7) {
+                    val dayNum = r * 7 + c - lead + 1
+                    if (dayNum in 1..daysInMonth) {
+                        val d = month.withDayOfMonth(dayNum)
+                        val cnt = counts[d] ?: 0
+                        val isToday = d == today
+                        val isSel = d == selected
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .aspectRatio(1f)
+                                .background(heatColor(cnt), RoundedCornerShape(9.dp))
+                                .then(
+                                    when {
+                                        isSel -> Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(9.dp))
+                                        isToday -> Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(9.dp))
+                                        else -> Modifier
+                                    },
+                                )
+                                .clickable { onPick(d) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                "$dayNum",
+                                fontSize = 12.sp,
+                                fontWeight = if (cnt > 0) FontWeight.SemiBold else FontWeight.Normal,
+                                color = if (cnt >= 3) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 年热力图（原型 .cal-year/.ygrid）：12 行月份 × 31 天，GitHub 贡献图式 */
+@Composable
+private fun YearHeatmap(year: Int, counts: Map<LocalDate, Int>) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        for (m in 1..12) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    "${m}月",
+                    fontSize = 8.5.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(26.dp),
+                )
+                val dim = java.time.YearMonth.of(year, m).lengthOfMonth()
+                for (d in 1..31) {
+                    val cnt = if (d <= dim) counts[LocalDate.of(year, m, d)] ?: 0 else -1
+                    val bg = when {
+                        cnt < 0 -> Color.Transparent
+                        cnt >= 4 -> MaterialTheme.colorScheme.primary
+                        cnt >= 2 -> Color(0xFFBFE0CD)
+                        cnt == 1 -> MaterialTheme.colorScheme.primaryContainer
+                        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                    }
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(10.dp)
+                            .background(bg, RoundedCornerShape(2.dp)),
+                    )
+                }
             }
         }
     }

@@ -58,10 +58,13 @@ data class TodayUi(
     val weekDays: List<LocalDate>,
     val weekCounts: Map<LocalDate, Int>,
     val weekRecordCount: Int,
+    val weekOffset: Int,
     val selectedDay: LocalDate,
     val dayRecords: List<DayRecordUi>,
     val monthActiveDays: Int,
     val monthRecords: Int,
+    val monthCounts: Map<LocalDate, Int>,
+    val yearCounts: Map<LocalDate, Int>,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -242,15 +245,18 @@ class TodayViewModel @Inject constructor(
             weekDays = week,
             weekCounts = weekCounts,
             weekRecordCount = weekRecs.size,
+            weekOffset = offset,
             selectedDay = day,
             dayRecords = records.filter { dayOf(it.time) == day }.sortedByDescending { it.time },
             monthActiveDays = monthRecs.groupingBy { dayOf(it.time) }.eachCount().size,
             monthRecords = monthRecs.size,
+            monthCounts = monthRecs.groupingBy { dayOf(it.time) }.eachCount(),
+            yearCounts = records.filter { dayOf(it.time).year == today.year }.groupingBy { dayOf(it.time) }.eachCount(),
         )
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
-        TodayUi(false, "", "", null, null, BirdAccents[0], "", null, null, 0, emptyList(), null, weekDaysOf(LocalDate.now()), emptyMap(), 0, LocalDate.now(), emptyList(), 0, 0),
+        TodayUi(false, "", "", null, null, BirdAccents[0], "", null, null, 0, emptyList(), null, weekDaysOf(LocalDate.now()), emptyMap(), 0, 0, LocalDate.now(), emptyList(), 0, 0, emptyMap(), emptyMap()),
     )
 
     private fun weekDaysOf(today: LocalDate): List<LocalDate> {

@@ -30,6 +30,7 @@ class DiaryRepository @Inject constructor(
     private val mediaDir: File get() = File(context.filesDir, "media").apply { mkdirs() }
 
     fun observeAllEntries(): Flow<List<DiaryEntryEntity>> = dao.observeAll()
+    fun observeForPet(petId: String): Flow<List<DiaryEntryEntity>> = dao.observeForPet(petId)
     fun observeAllMedia(): Flow<List<DiaryMediaEntity>> = dao.observeAllMedia()
     fun observeGeotagged(): Flow<List<DiaryMediaEntity>> = dao.observeGeotagged()
     fun observeGeotaggedNamed(): Flow<List<GeoMediaRow>> = dao.observeGeoNamed()

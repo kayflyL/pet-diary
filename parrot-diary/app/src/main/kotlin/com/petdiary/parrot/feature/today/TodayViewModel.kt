@@ -12,8 +12,12 @@ import com.petdiary.parrot.data.ReminderRepository
 import com.petdiary.parrot.data.PetRepository
 import com.petdiary.parrot.data.PlaceRepository
 import com.petdiary.parrot.data.WeightRepository
+import com.petdiary.parrot.data.local.DiaryEntryEntity
+import com.petdiary.parrot.data.local.ExpenseLogEntity
+import com.petdiary.parrot.data.local.FeedLogEntity
 import com.petdiary.parrot.data.local.FoodEntity
 import com.petdiary.parrot.data.local.PetEntity
+import com.petdiary.parrot.data.local.ReminderEntity
 import com.petdiary.parrot.data.local.WeightLogEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
@@ -27,10 +31,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-data class DayDots(val date: LocalDate, val count: Int)
+/** 当天时间线里的一条记录（称重/喂食/日记统一） */
+data class DayRecordUi(
+    val id: String,
+    val kind: String, // WEIGHT / FEED / DIARY
+    val title: String,
+    val time: Long,
+    val badge: String? = null,
+)
 
 data class TodayUi(
     val hasBird: Boolean,
@@ -47,8 +59,11 @@ data class TodayUi(
     val selectedBirdId: String?,
     val weekDays: List<LocalDate>,
     val weekCounts: Map<LocalDate, Int>,
+    val weekRecordCount: Int,
     val selectedDay: LocalDate,
-    val selectedDayRecords: List<WeightLogEntity>,
+    val dayRecords: List<DayRecordUi>,
+    val monthActiveDays: Int,
+    val monthRecords: Int,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -70,12 +85,15 @@ class TodayViewModel @Inject constructor(
         }
     }
 
-    val dueReminders: StateFlow<List<com.petdiary.parrot.data.local.ReminderEntity>> = reminderRepository.observeDue()
+    /** 到期照护提醒（今天页「周期照护」卡片） */
+    val dueReminders: StateFlow<List<ReminderEntity>> = reminderRepository.observeDue()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun completeReminder(id: String) {
         viewModelScope.launch { reminderRepository.completeOnce(id) }
     }
+
+    val expenseCategories: List<Pair<String, String>> = ExpenseRepository.CATEGORIES
 
     fun addExpense(category: String, amount: Double, note: String?) {
         viewModelScope.launch { expenseRepository.add(selectedBird.value?.id, category, amount, note) }
@@ -91,17 +109,6 @@ class TodayViewModel @Inject constructor(
         viewModelScope.launch { diaryRepository.saveCameraPhoto(pet.id, uri) }
     }
 
-    init {
-        viewModelScope.launch {
-            foodRepository.ensureBuiltinImported()
-            placeRepository.ensureHomePlace()
-        }
-    }
-
-    init {
-        viewModelScope.launch { placeRepository.ensureHomePlace() }
-    }
-
     val birds: StateFlow<List<PetEntity>> = petRepository.observeActive()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -114,6 +121,18 @@ class TodayViewModel @Inject constructor(
     val weights: StateFlow<List<WeightLogEntity>> = selectedBird
         .flatMapLatest { pet ->
             pet?.let { weightRepository.observeFor(it.id) } ?: flowOf(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val feeds: StateFlow<List<FeedLogEntity>> = selectedBird
+        .flatMapLatest { pet ->
+            pet?.let { foodRepository.observeFeedsFor(it.id) } ?: flowOf(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val diaries: StateFlow<List<DiaryEntryEntity>> = selectedBird
+        .flatMapLatest { pet ->
+            pet?.let { diaryRepository.observeForPet(pet.id) } ?: flowOf(emptyList())
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -145,34 +164,95 @@ class TodayViewModel @Inject constructor(
         viewModelScope.launch { foodRepository.recordFeed(pet.id, foodId, note = note) }
     }
 
-    fun todayUi(today: LocalDate): StateFlow<TodayUi> =
-        combine(selectedBird, birds, weights) { pet, allBirds, weights ->
-            val zone = ZoneId.systemDefault()
-            fun dayOf(millis: Long) = Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
-            val monday = today.with(java.time.DayOfWeek.MONDAY)
-            val week = (0..6L).map { monday.plusDays(it) }
-            val counts = weights.groupingBy { dayOf(it.weighedAt) }.eachCount()
-            val selected = today // 选中日恒为今天（简化：历史回看在 M3.5 加）
-            val todayRecords = weights.filter { dayOf(it.weighedAt) == selected }.sortedByDescending { it.weighedAt }
-            TodayUi(
-                hasBird = pet != null,
-                name = pet?.name.orEmpty(),
-                speciesName = pet?.let { SpeciesCatalog.nameOf(it.speciesId) }.orEmpty(),
-                ageText = pet?.let { AgeFormatter.formatAge(it.birthDateEpochDay, today.toEpochDay()) },
-                companionText = pet?.let { AgeFormatter.formatCompanion(it.gotchaDateEpochDay, it.birthDateEpochDay, today.toEpochDay()) },
-                accent = BirdAccents[(pet?.accentIndex ?: 0).coerceIn(BirdAccents.indices)],
-                initial = pet?.name?.take(1).orEmpty(),
-                latestGrams = weights.maxByOrNull { it.weighedAt }?.grams,
-                latestWeightText = weights.maxByOrNull { it.weighedAt }?.let { "${it.grams} g" },
-                recordCount = weights.size,
-                birds = allBirds,
-                selectedBirdId = pet?.id,
-                weekDays = week,
-                weekCounts = counts,
-                selectedDay = selected,
-                selectedDayRecords = todayRecords,
-            )
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodayUi(false, "", "", null, null, BirdAccents[0], "", null, null, 0, emptyList(), null, weekDaysOf(today), emptyMap(), today, emptyList()))
+    // ── 周历状态：选中日 + 周偏移 ──
+    private val selectedDay = MutableStateFlow(LocalDate.now())
+    private val weekOffset = MutableStateFlow(0)
+
+    fun selectDay(d: LocalDate) {
+        selectedDay.value = d
+    }
+
+    fun shiftWeek(delta: Int) {
+        weekOffset.value += delta
+    }
+
+    fun backToToday() {
+        weekOffset.value = 0
+        selectedDay.value = LocalDate.now()
+    }
+
+    /** 该鸟全部记录（称重/喂食/日记）统一为时间线条目 */
+    private val unifiedRecords: StateFlow<List<DayRecordUi>> = combine(
+        weights,
+        feeds,
+        diaries,
+        allFoods,
+        selectedBird,
+    ) { ws, fs, ds, foods, pet ->
+        val name = pet?.name.orEmpty()
+        val favIds = favoriteFoods.value.map { it.first }.toSet()
+        val foodName = { id: String? -> foods.firstOrNull { it.id == id }?.name ?: "口粮" }
+        buildList {
+            ws.forEach { w -> add(DayRecordUi(w.id, "WEIGHT", "$name 称重 ${w.grams} g", w.weighedAt)) }
+            fs.forEach { f ->
+                add(
+                    DayRecordUi(
+                        f.id,
+                        "FEED",
+                        "$name 吃了 ${foodName(f.foodId)}",
+                        f.fedAt,
+                        if (f.foodId != null && f.foodId in favIds) "最爱" else null,
+                    ),
+                )
+            }
+            ds.forEach { d ->
+                add(DayRecordUi(d.id, "DIARY", d.text.ifBlank { "$name 的日记" }, d.happenedAt))
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun todayUi(today: LocalDate): StateFlow<TodayUi> = combine(
+        unifiedRecords,
+        selectedDay,
+        weekOffset,
+        birds,
+        selectedBird,
+    ) { records: List<DayRecordUi>, day: LocalDate, offset: Int, allBirds: List<PetEntity>, pet: PetEntity? ->
+        val zone = ZoneId.systemDefault()
+        fun dayOf(millis: Long) = Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
+        val monday = today.with(java.time.DayOfWeek.MONDAY).plusWeeks(offset.toLong())
+        val week = (0..6L).map { monday.plusDays(it) }
+        val weekSet = week.toSet()
+        val weekRecs = records.filter { dayOf(it.time) in weekSet }.sortedByDescending { it.time }
+        val weekCounts = weekRecs.groupingBy { dayOf(it.time) }.eachCount()
+        val monthRecs = records.filter { dayOf(it.time).let { d -> d.year == today.year && d.month == today.month } }
+        val weightsForPet = records.filter { it.kind == "WEIGHT" }
+        TodayUi(
+            hasBird = pet != null,
+            name = pet?.name.orEmpty(),
+            speciesName = pet?.let { SpeciesCatalog.nameOf(it.speciesId) }.orEmpty(),
+            ageText = pet?.let { AgeFormatter.formatAge(it.birthDateEpochDay, today.toEpochDay()) },
+            companionText = pet?.let { AgeFormatter.formatCompanion(it.gotchaDateEpochDay, it.birthDateEpochDay, today.toEpochDay()) },
+            accent = BirdAccents[(pet?.accentIndex ?: 0).coerceIn(BirdAccents.indices)],
+            initial = pet?.name?.take(1).orEmpty(),
+            latestGrams = weights.value.maxByOrNull { it.weighedAt }?.grams,
+            latestWeightText = weights.value.maxByOrNull { it.weighedAt }?.let { "${it.grams} g" },
+            recordCount = weights.value.size,
+            birds = allBirds,
+            selectedBirdId = pet?.id,
+            weekDays = week,
+            weekCounts = weekCounts,
+            weekRecordCount = weekRecs.size,
+            selectedDay = day,
+            dayRecords = records.filter { dayOf(it.time) == day }.sortedByDescending { it.time },
+            monthActiveDays = monthRecs.groupingBy { dayOf(it.time) }.eachCount().size,
+            monthRecords = monthRecs.size,
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        TodayUi(false, "", "", null, null, BirdAccents[0], "", null, null, 0, emptyList(), null, weekDaysOf(LocalDate.now()), emptyMap(), 0, LocalDate.now(), emptyList(), 0, 0),
+    )
 
     private fun weekDaysOf(today: LocalDate): List<LocalDate> {
         val monday = today.with(java.time.DayOfWeek.MONDAY)

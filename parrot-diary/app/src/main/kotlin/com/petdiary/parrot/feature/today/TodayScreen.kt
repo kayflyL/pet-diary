@@ -16,10 +16,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.ChevronRight
@@ -49,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
@@ -56,7 +61,9 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+
 import com.petdiary.parrot.core.designsystem.BirdAccents
+import com.petdiary.parrot.data.local.ReminderEntity
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
@@ -71,6 +78,7 @@ fun TodayScreen(
 ) {
     val today = LocalDate.now()
     val ui by vm.todayUi(today).collectAsState()
+    val dueReminders by vm.dueReminders.collectAsState()
     val favoriteFoods by vm.favoriteFoods.collectAsState()
     val allFoods by vm.allFoods.collectAsState()
     var sheet by remember { mutableStateOf<String?>(null) }
@@ -131,7 +139,7 @@ fun TodayScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Text("去「鸟」页添加第一只鸟吧 🦜", style = MaterialTheme.typography.titleMedium)
+                Text("去「鸟」页添加第一只鸟吧", style = MaterialTheme.typography.titleMedium)
             }
         } else {
             LazyColumn(
@@ -139,29 +147,80 @@ fun TodayScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             ) {
                 item { HeroCard(ui, ui.birds, vm::selectBird) { onBirdClick(ui.selectedBirdId ?: return@HeroCard) } }
-                item { Spacer(Modifier.height(4.dp)) }
-                item { WeekStrip(ui.weekDays, ui.weekCounts, today) }
-                item { Spacer(Modifier.height(6.dp)) }
+                item { Spacer(Modifier.height(10.dp)) }
                 item {
+                    WeekCard(
+                        ui = ui,
+                        onPrev = { vm.shiftWeek(-1) },
+                        onNext = { vm.shiftWeek(1) },
+                        onToday = { vm.backToToday() },
+                        onPickDay = { vm.selectDay(it) },
+                    )
+                }
+                item {
+                    val sel = ui.selectedDay
+                    val isToday = sel == today
                     Text(
-                        "${today.monthValue} 月 ${today.dayOfMonth} 日（今天）· ${ui.selectedDayRecords.size} 条记录",
+                        (if (isToday) "${sel.monthValue} 月 ${sel.dayOfMonth} 日 · 今天" else "${sel.monthValue} 月 ${sel.dayOfMonth} 日") +
+                            " · ${ui.dayRecords.size} 条记录",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(vertical = 10.dp),
                     )
                 }
-                if (ui.selectedDayRecords.isEmpty()) {
+                if (ui.dayRecords.isEmpty()) {
                     item {
                         Text(
-                            "今天还没有记录，点右下角 ➕ 记一笔",
+                            "这一天还没有记录，点右下角 ＋ 记一笔",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(vertical = 8.dp),
                         )
                     }
                 } else {
-                    items(ui.selectedDayRecords, key = { it.id }) { w ->
-                        RecordRow(w, ui.name)
+                    items(ui.dayRecords, key = { it.kind + it.id }) { r ->
+                        RecordRow(r)
+                    }
+                }
+                // 周期照护（原型：到期提醒卡片 + 记一次顺延）
+                if (dueReminders.isNotEmpty()) {
+                    item { Text("周期照护", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp)) }
+                    items(dueReminders, key = { it.id }) { rem ->
+                        val daysLeft = ((rem.nextAt - System.currentTimeMillis()) / 86_400_000L).toInt()
+                        val dueText = when {
+                            daysLeft < 0 -> "已过期 ${-daysLeft} 天"
+                            daysLeft == 0 -> "今天到期"
+                            else -> "还剩 $daysLeft 天"
+                        }
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp))
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(11.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier.size(36.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(11.dp)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text("💊", fontSize = 15.sp)
+                            }
+                            Column(Modifier.weight(1f)) {
+                                Text(rem.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    "每 ${rem.intervalDays} 天 · $dueText",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Button(
+                                onClick = { vm.completeReminder(rem.id) },
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            ) {
+                                Text("记一次", fontSize = 12.sp)
+                            }
+                        }
                     }
                 }
                 item { Spacer(Modifier.height(90.dp)) }
@@ -171,12 +230,19 @@ fun TodayScreen(
 
     when (sheet) {
         "menu" -> ModalBottomSheet(onDismissRequest = { sheet = null }, sheetState = sheetState) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+            ) {
             Text("记一笔 · ${ui.name}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp))
             SheetRow("⚖", "记体重", "默认上次 ${ui.latestWeightText ?: "—"}") { sheet = "weight" }
             SheetRow("🌾", "记喂食", "最爱食物优先") { sheet = "feed" }
             SheetRow("📷", "拍照", "随手拍进回忆 · 自动记录地点") { sheet = null; shoot() }
             SheetRow("✏️", "写日记", "文字 + 照片 + 心情标签") { sheet = "diary" }
+            SheetRow("💰", "记开销", "花销随手记") { sheet = "expense" }
             Spacer(Modifier.height(14.dp))
+            }
         }
         "weight" -> WeightSheet(
             birdName = ui.name,
@@ -202,6 +268,14 @@ fun TodayScreen(
             onDismiss = { sheet = null },
             onSave = { text, tags, uris ->
                 vm.saveDiary(text, tags, uris)
+                sheet = null
+            },
+        )
+        "expense" -> ExpenseSheet(
+            categories = vm.expenseCategories,
+            onDismiss = { sheet = null },
+            onSave = { category, amount ->
+                vm.addExpense(category, amount, null)
                 sheet = null
             },
         )
@@ -277,47 +351,114 @@ private fun GlassStat(value: String, label: String) {
     }
 }
 
+/** 周历卡（原型 .cal-head/.week/.legend）：周导航 + 可点日格 + 本月汇总 */
 @Composable
-private fun WeekStrip(days: List<LocalDate>, counts: Map<LocalDate, Int>, today: LocalDate) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        days.forEach { d ->
-            val c = counts[d] ?: 0
-            val isToday = d == today
-            val bg = when {
-                c >= 3 -> MaterialTheme.colorScheme.primary
-                c == 2 -> Color(0xFFBFE0CD)
-                c == 1 -> MaterialTheme.colorScheme.primaryContainer
-                else -> MaterialTheme.colorScheme.surfaceVariant
+private fun WeekCard(
+    ui: TodayUi,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    onToday: () -> Unit,
+    onPickDay: (LocalDate) -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+            .padding(14.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("本周 · ${ui.weekRecordCount} 笔", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                NavChip("‹", onPrev)
+                NavChip("今天", onToday)
+                NavChip("›", onNext)
             }
-            val content = if (c >= 3) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(bg, RoundedCornerShape(13.dp))
-                    .then(if (isToday) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(13.dp)) else Modifier)
-                    .padding(vertical = 9.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        "${d.dayOfMonth}",
-                        fontSize = 13.sp,
-                        fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.SemiBold,
-                        color = content,
-                    )
-                    Text(
-                        d.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.CHINESE),
-                        fontSize = 9.5.sp,
-                        color = content.copy(alpha = 0.65f),
-                    )
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ui.weekDays.forEach { d ->
+                val c = ui.weekCounts[d] ?: 0
+                val isToday = d == LocalDate.now()
+                val isSel = d == ui.selectedDay
+                val bg = when {
+                    c >= 3 -> MaterialTheme.colorScheme.primary
+                    c == 2 -> Color(0xFFBFE0CD)
+                    c == 1 -> MaterialTheme.colorScheme.primaryContainer
+                    else -> MaterialTheme.colorScheme.surfaceVariant
                 }
+                val content = if (c >= 3) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(bg, RoundedCornerShape(13.dp))
+                        .then(
+                            when {
+                                isSel -> Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(13.dp))
+                                isToday -> Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(13.dp))
+                                else -> Modifier
+                            },
+                        )
+                        .clickable { onPickDay(d) }
+                        .padding(vertical = 9.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            "${d.dayOfMonth}",
+                            fontSize = 13.sp,
+                            fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.SemiBold,
+                            color = content,
+                        )
+                        Text(
+                            d.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.CHINESE),
+                            fontSize = 9.5.sp,
+                            color = content.copy(alpha = 0.65f),
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth()) {
+            Text(
+                "本月 ${ui.monthActiveDays} 天 · ${ui.monthRecords} 笔",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("少", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                listOf(
+                    MaterialTheme.colorScheme.surfaceVariant,
+                    MaterialTheme.colorScheme.primaryContainer,
+                    Color(0xFFBFE0CD),
+                    MaterialTheme.colorScheme.primary,
+                ).forEach { c ->
+                    Box(Modifier.size(9.dp).background(c, CircleShape))
+                }
+                Text("多", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 }
 
 @Composable
-private fun RecordRow(w: com.petdiary.parrot.data.local.WeightLogEntity, birdName: String) {
+private fun NavChip(label: String, onClick: () -> Unit) {
+    Text(
+        label,
+        fontSize = 11.5.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 9.dp, vertical = 4.dp),
+    )
+}
+
+/** 当天时间线行：称重/喂食/日记统一（喂食带最爱徽章） */
+@Composable
+private fun RecordRow(r: com.petdiary.parrot.feature.today.DayRecordUi) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -327,17 +468,75 @@ private fun RecordRow(w: com.petdiary.parrot.data.local.WeightLogEntity, birdNam
             modifier = Modifier.size(36.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(11.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Text("⚖", fontSize = 16.sp)
-        }
-        Column {
-            Text("$birdName 称重 ${w.grams} g", fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
             Text(
-                java.time.Instant.ofEpochMilli(w.weighedAt).atZone(java.time.ZoneId.systemDefault())
+                when (r.kind) {
+                    "WEIGHT" -> "⚖"
+                    "FEED" -> "🌾"
+                    else -> "✏️"
+                },
+                fontSize = 15.sp,
+            )
+        }
+        Column(Modifier.weight(1f)) {
+            Text(r.title, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                java.time.Instant.ofEpochMilli(r.time).atZone(java.time.ZoneId.systemDefault())
                     .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")),
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        if (r.badge != null) {
+            Text(
+                r.badge,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+        }
+    }
+}
+
+/** 记开销表单（原型 FAB 五项之一） */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExpenseSheet(
+    categories: List<Pair<String, String>>,
+    onDismiss: () -> Unit,
+    onSave: (String, Double) -> Unit,
+) {
+    var cat by remember { mutableStateOf(categories.firstOrNull()?.first ?: "OTHER") }
+    var amountText by remember { mutableStateOf("") }
+    val amount = amountText.toDoubleOrNull()
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Text("记一笔 · 开销", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp))
+        Text("分类", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+            categories.forEach { (code, label) ->
+                FilterChip(selected = cat == code, onClick = { cat = code }, label = { Text(label) })
+            }
+        }
+        OutlinedTextField(
+            value = amountText,
+            onValueChange = { amountText = it.filter { ch -> ch.isDigit() || ch == '.' } },
+            singleLine = true,
+            label = { Text("金额（元）") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Button(
+            onClick = { onSave(cat, amount ?: 0.0) },
+            enabled = (amount ?: 0.0) > 0,
+            modifier = Modifier.fillMaxWidth().height(52.dp).padding(top = 14.dp),
+        ) {
+            Text("✓ 保存", fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(12.dp))
     }
 }
 
@@ -371,7 +570,7 @@ private fun DiarySheet(
             modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = uris.isNotEmpty(), onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, label = { Text("🖼 选择照片 ${if (uris.isNotEmpty()) "(${uris.size})" else ""}") })
+            FilterChip(selected = uris.isNotEmpty(), onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, label = { Text("选择照片 ${if (uris.isNotEmpty()) "(${uris.size})" else ""}") })
         }
         Text("心情标签", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -392,7 +591,8 @@ private fun DiarySheet(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun WeightSheet(birdName: String, initialGrams: Double?, onDismiss: () -> Unit, onSave: (Double) -> Unit) {    var grams by remember { mutableStateOf(initialGrams ?: 0.0) }
+private fun WeightSheet(birdName: String, initialGrams: Double?, onDismiss: () -> Unit, onSave: (Double) -> Unit) {
+    var grams by remember { mutableStateOf(initialGrams ?: 0.0) }
     val sheetState = rememberModalBottomSheetState()
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Text("$birdName · 记体重", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp))

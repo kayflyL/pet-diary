@@ -40,6 +40,7 @@ class FoodRepository @Inject constructor(
     }
 
     fun observeAllFoods(): Flow<List<FoodEntity>> = foodDao.observeAll()
+    fun observeFeedsFor(petId: String): Flow<List<FeedLogEntity>> = feedLogDao.observeForPet(petId)
     suspend fun foodById(id: String): FoodEntity? = foodDao.getById(id)
     suspend fun foodNames(): Map<String, String> =
         foodDao.observeAll().first().associate { it.id to it.name }

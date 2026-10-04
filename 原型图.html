@@ -302,10 +302,19 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
 .fs-back{position:absolute;top:10px;left:10px;width:30px;height:30px;border-radius:50%;background:rgba(16,19,18,.55);color:#fff;font-size:14px;cursor:pointer;z-index:7;display:flex;align-items:center;justify-content:center}
 .fs-stats{position:absolute;top:12px;right:12px;background:rgba(16,19,18,.72);color:#fff;font-size:10.5px;padding:4px 10px;border-radius:999px;z-index:6;display:block}
 .ptag{position:absolute;transform:translate(-50%,0);font-size:9.5px;background:rgba(16,19,18,.75);color:#fff;padding:1px 7px;border-radius:6px;z-index:3;display:block;white-space:nowrap}
-.fs-slider{display:block;margin:10px 2px;background:rgba(16,19,18,.85);border-radius:12px;padding:8px 14px 6px;color:#fff}
-.fs-slider .sl-label{font-size:11px;text-align:center;margin-bottom:2px}
-.fs-slider input[type=range]{width:100%;accent-color:#2F8F5B}
-.fs-slider .sl-ticks{display:flex;justify-content:space-between;font-size:9px;color:#A8B3AC}
+/* 时光滑轨（M3 Expressive × Metro）：纸白磨砂面板 + 大日期 + 照片分布点 + 胶囊把手 */
+.ts-panel{background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:16px;padding:12px 16px 10px;color:var(--ink);box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.ts-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.ts-date{font-size:21px;font-weight:800;letter-spacing:-.4px}
+.ts-count{font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
+.ts-track{position:relative;height:22px;cursor:pointer;touch-action:none}
+.ts-rail{position:absolute;left:0;right:0;top:9px;height:5px;border-radius:3px;background:#E2E5E1}
+.ts-fill{position:absolute;left:0;top:9px;height:5px;border-radius:3px;background:#2F8F5B}
+.ts-pdot{position:absolute;top:11.5px;width:7px;height:7px;border-radius:50%;background:#C9D2CC;border:1.5px solid #fff;box-sizing:content-box;transform:translate(-50%,-50%)}
+.ts-pdot.lit{background:#2F8F5B}
+.ts-thumb{position:absolute;top:0;width:5px;height:22px;border-radius:3px;background:var(--ink);transform:translateX(-50%);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.ts-ticks{display:flex;justify-content:space-between;font-size:9.5px;color:var(--sub);margin-top:5px;position:relative}
+.ts-today{margin-top:9px;width:100%;border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 0;font-size:11.5px;font-weight:700;cursor:pointer;color:var(--ink)}
 /* 全屏大图：点击缩放、拖拽平移 */
 .pv-img{transition:transform .18s ease}
 .pv-img.zoomed{cursor:grab}
@@ -483,10 +492,10 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
       <span class="zdot" style="left:16%;top:72%;background:linear-gradient(140deg,#FFE9BE,#F0C25F)" onclick="event.stopPropagation();qpOpen('grandma',this,0)">🏡</span>
       <span class="zdot" style="left:27%;top:81%;background:linear-gradient(140deg,#FFE9BE,#F0C25F)" onclick="event.stopPropagation();qpOpen('grandma',this,1)">🥧</span>
       <span class="zdot" style="left:30%;top:33%;background:linear-gradient(140deg,#D4E5F7,#8FB3D9)" onclick="event.stopPropagation();qpOpen('vet',this,0)">🏥</span>
-      <span class="ptag" style="left:76%;top:38%">人民公园</span>
-      <span class="ptag" style="left:50%;top:68%">家</span>
-      <span class="ptag" style="left:22%;top:88%">外婆家</span>
-      <span class="ptag" style="left:30%;top:45%">安安异宠医院</span>
+      <span class="ptag" data-k="park" style="left:76%;top:38%">人民公园</span>
+      <span class="ptag" data-k="home" style="left:50%;top:68%">家</span>
+      <span class="ptag" data-k="grandma" style="left:22%;top:88%">外婆家</span>
+      <span class="ptag" data-k="vet" style="left:30%;top:45%">安安异宠医院</span>
       </div>
       <span class="fs-stats">📍 9 张有位置信息 · 4 个地方</span>
       <div class="zbtns"><span class="zbtn" onclick="event.stopPropagation();mzStep(1)">＋</span><span class="zbtn" onclick="event.stopPropagation();mzStep(-1)">－</span></div>
@@ -499,10 +508,19 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
         <div class="qp-info"><span id="qp-meta"></span><span id="qp-idx"></span></div>
       </div>
     </div>
-    <div class="fs-slider">
-      <div class="sl-label" id="fs-label">📅 全部时间 · 9 张</div>
-      <input type="range" min="0" max="9" value="9" oninput="fsSlide(this.value)">
-      <div class="sl-ticks"><span>2025-12</span><span>2026-04</span><span>2026-06</span><span>2026-08</span><span>2026-09</span><span>2026-10</span></div>
+    <div class="ts-panel" onclick="event.stopPropagation()">
+      <div class="ts-top">
+        <span class="ts-date" id="ts-date">全部时间</span>
+        <span class="ts-count" id="ts-count"></span>
+      </div>
+      <div class="ts-track" id="ts-track">
+        <div class="ts-rail"></div>
+        <div class="ts-fill" id="ts-fill"></div>
+        <div id="ts-dots"></div>
+        <div class="ts-thumb" id="ts-thumb"></div>
+      </div>
+      <div class="ts-ticks" id="ts-ticks"></div>
+      <button class="ts-today" onclick="event.stopPropagation();tsSet(1)">回到今天</button>
     </div>
   </div>
 
@@ -842,10 +860,46 @@ function qpRender(){const pl=PVDATA[qpK];const p=pl.photos[qpI];
  document.getElementById('qp-idx').textContent=(qpI+1)+' / '+pl.photos.length;}
 function qpMove(d){qpI=(qpI+d+PVDATA[qpK].photos.length)%PVDATA[qpK].photos.length;qpRender();}
 function qpClose(){document.getElementById('qp').classList.remove('show');}
-function fsSlide(v){v=+v;const show={vet:v>=1,grandma:v>=2,park:v>=4,home:v>=7};
+// 时光滑轨引擎：照片按拍摄时间升序铺在轨道上，拖动按时间点亮（含地图聚合联动）
+const TS_ALL=[];
+Object.keys(PVDATA).forEach(k=>PVDATA[k].photos.forEach((p,i)=>TS_ALL.push({k,i,t:p.t,num:Date.parse(p.t.replace(' ','T'))})));
+TS_ALL.sort((a,b)=>a.num-b.num);
+const TS_MIN=TS_ALL[0].num,TS_MAX=TS_ALL[TS_ALL.length-1].num;
+function tsSet(frac){const f=Math.min(1,Math.max(0,frac));tsRender(f);}
+function tsRender(frac){
+ const chosen=TS_MIN+frac*(TS_MAX-TS_MIN);
+ const shown=TS_ALL.filter(p=>p.num<=chosen);
+ const last=shown[shown.length-1];
+ const d=last?new Date(last.t.replace(' ','T')):null;
+ document.getElementById('ts-date').textContent=frac>=1?'全部时间':(d?`${d.getMonth()+1} 月 ${d.getDate()} 日`:'—');
+ document.getElementById('ts-count').textContent=`${shown.length} / ${TS_ALL.length} 张`;
+ document.getElementById('ts-fill').style.width=(frac*100)+'%';
+ document.getElementById('ts-thumb').style.left=(frac*100)+'%';
+ const dotsBox=document.getElementById('ts-dots');dotsBox.innerHTML='';
+ TS_ALL.forEach((p,i)=>{const pos=(p.num-TS_MIN)/(TS_MAX-TS_MIN)*100;
+  const el=document.createElement('span');el.className='ts-pdot'+(i<shown.length?' lit':'');
+  el.style.left=pos+'%';dotsBox.appendChild(el);});
+ const ticks=document.getElementById('ts-ticks');ticks.innerHTML='';
+ const minD=new Date(TS_MIN),maxD=new Date(TS_MAX);
+ let cur=new Date(minD.getFullYear(),minD.getMonth(),1);const tickList=[];
+ while(cur<=maxD){tickList.push(cur);cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);}
+ tickList.push(maxD);
+ tickList.forEach(dd=>{const pos=Math.min(100,Math.max(0,(dd.getTime()-TS_MIN)/(TS_MAX-TS_MIN)*100));
+  const sp=document.createElement('span');sp.textContent=(dd.getMonth()+1)+'月';
+  sp.style.position='absolute';sp.style.left='calc('+pos+'% - 8px)';ticks.appendChild(sp);});
+ const show={};
+ TS_ALL.filter(p=>p.num<=chosen).forEach(p=>show[p.k]=true);
  document.querySelectorAll('#m-map .pcl').forEach(el=>{const m=el.getAttribute('onclick').match(/qpOpen\('(\w+)'/);if(m)el.style.display=show[m[1]]?'flex':'none';});
- document.getElementById('fs-label').textContent=v>=9?'📅 全部时间 · 9 张':v>=4?'📅 至 2026-09 · 6 张':v>=2?'📅 至 2026-08 · 3 张':'📅 至 2025-12 · 1 张';
- if(qpK&&!show[qpK])qpClose();}
+document.querySelectorAll('#m-map .ptag').forEach(el=>{const k=el.getAttribute('data-k');el.style.display=(k&&show[k])?'block':'none';});
+ if(qpK&&!show[qpK])qpClose();
+}
+(function(){const tr=document.getElementById('ts-track');
+ function frac(e){const r=tr.getBoundingClientRect();return Math.min(1,Math.max(0,(e.clientX-r.left)/r.width));}
+ let dragging=false;
+ tr.addEventListener('pointerdown',e=>{dragging=true;tr.setPointerCapture(e.pointerId);tsSet(frac(e));});
+ tr.addEventListener('pointermove',e=>{if(dragging)tsSet(frac(e));});
+ tr.addEventListener('pointerup',()=>{dragging=false;});
+ tsRender(1);})();
 let mzI=0,mzTx=0,mzTy=0,mzDrag=null,mzMoved=false;
 const MZ=[1,2,3.2];
 function mzApply(){const pm=document.getElementById('pmap');const z=MZ[mzI];

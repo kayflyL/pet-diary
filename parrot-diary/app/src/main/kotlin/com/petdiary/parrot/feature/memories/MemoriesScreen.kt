@@ -13,7 +13,9 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -25,7 +27,9 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.core.view.doOnLayout
 import androidx.compose.foundation.layout.width
@@ -37,7 +41,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -61,7 +64,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -71,7 +76,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 import org.osmdroid.events.MapListener
@@ -858,30 +865,119 @@ private fun PhotoMap(
                 }
             }
         }
-        // 时光滑轨面板（原型 .fs-slider：地图下方）
+        // 时光滑轨面板（原型 .ts-panel：纸白磨砂 + 大日期实时跳动 + 照片分布点）
+        val nums = remember(ordered) { ordered.map { it.photo.takenAt ?: (it.photo.date.toEpochDay() * 86400000L) } }
+        val minN = nums.first()
+        val maxN = nums.last()
+        val spanN = (maxN - minN).coerceAtLeast(1L)
+        val frac = shown.toFloat() / ordered.size
+        val fracOf: (Int) -> Float = { i -> ((nums[i] - minN).toFloat() / spanN).coerceIn(0f, 1f) }
+        val lastDate = Instant.ofEpochMilli(nums[(shown - 1).coerceAtLeast(0)]).atZone(ZoneId.systemDefault()).toLocalDate()
+        val density = LocalDensity.current
+        val dotHalfPx = with(density) { 3.5.dp.toPx() }
+        val thumbHalfPx = with(density) { 2.5.dp.toPx() }
+        var trackW by remember { mutableFloatStateOf(0f) }
         Column(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 10.dp, vertical = 6.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xD9101312))
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xF5FFFFFF))
+                .border(1.dp, Color(0xFFE2E5E1), RoundedCornerShape(16.dp))
+                .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
-            Text(
-                if (shown >= ordered.size) "📅 全部时间 · ${ordered.size} 张" else "📅 至 ${points.last().photo.date.monthValue} 月 · $shown 张",
-                fontSize = 11.sp,
-                color = Color(0xFFA8B3AC),
-                modifier = Modifier.padding(bottom = 2.dp),
-            )
-            Slider(
-                value = shown.toFloat(),
-                onValueChange = { shown = it.toInt().coerceIn(1, ordered.size) },
-                valueRange = 1f..ordered.size.toFloat(),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                Text(
+                    if (shown >= ordered.size) "全部时间" else "${lastDate.monthValue} 月 ${lastDate.dayOfMonth} 日",
+                    fontSize = 21.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.4).sp,
+                    color = PaperInk,
+                )
+                Text(
+                    "$shown / ${ordered.size} 张",
+                    fontSize = 12.sp,
+                    color = SubInk,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(22.dp)
+                    .onGloballyPositioned { trackW = it.size.width.toFloat() }
+                    .pointerInput(ordered.size) {
+                        detectTapGestures { off ->
+                            if (trackW > 0) {
+                                shown = ((off.x / trackW).coerceIn(0f, 1f) * ordered.size).roundToInt().coerceIn(1, ordered.size)
+                            }
+                        }
+                    }
+                    .pointerInput(ordered.size) {
+                        detectHorizontalDragGestures { change, _ ->
+                            change.consume()
+                            if (trackW > 0) {
+                                shown = ((change.position.x / trackW).coerceIn(0f, 1f) * ordered.size).roundToInt().coerceIn(1, ordered.size)
+                            }
+                        }
+                    },
+            ) {
+                Box(
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxWidth()
+                        .height(5.dp)
+                        .background(Color(0xFFE2E5E1), RoundedCornerShape(3.dp)),
+                )
+                Box(
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxWidth(frac)
+                        .height(5.dp)
+                        .background(GreenInk, RoundedCornerShape(3.dp)),
+                )
+                ordered.forEachIndexed { i, _ ->
+                    val lit = i < shown
+                    val f = fracOf(i)
+                    Box(
+                        Modifier
+                            .align(Alignment.CenterStart)
+                            .offset { IntOffset((f * trackW).roundToInt() - dotHalfPx.roundToInt(), 0) }
+                            .size(7.dp)
+                            .background(if (lit) GreenInk else Color(0xFFC9D2CC), CircleShape)
+                            .border(1.5.dp, Color.White, CircleShape),
+                    )
+                }
+                Box(
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .offset { IntOffset((frac * trackW).roundToInt() - thumbHalfPx.roundToInt(), 0) }
+                        .size(5.dp, 22.dp)
+                        .background(PaperInk, RoundedCornerShape(3.dp)),
+                )
+            }
+            // 月份刻度（按数据范围）
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("${ordered.first().photo.date.monthValue}月", fontSize = 9.sp, color = Color(0xFFA8B3AC))
-                Text("${ordered.last().photo.date.monthValue}月", fontSize = 9.sp, color = Color(0xFFA8B3AC))
+                val firstM = ordered.first().photo.date
+                val lastM = ordered.last().photo.date
+                Text("${firstM.monthValue}月", fontSize = 9.5.sp, color = SubInk)
+                Text("${lastM.monthValue}月", fontSize = 9.5.sp, color = SubInk)
+            }
+            Spacer(Modifier.height(6.dp))
+            // 回到今天：一键重置
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(30.dp)
+                    .border(1.dp, Color(0xFFE2E5E1), RoundedCornerShape(10.dp))
+                    .clickable { shown = ordered.size },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("回到今天", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = PaperInk)
             }
         }
     }

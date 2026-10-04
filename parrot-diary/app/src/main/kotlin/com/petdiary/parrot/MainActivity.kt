@@ -33,7 +33,6 @@ import androidx.navigation.navArgument
 import com.petdiary.parrot.core.designsystem.ParrotDiaryTheme
 import com.petdiary.parrot.data.SettingsRepository
 import com.petdiary.parrot.feature.care.ExpensesScreen
-import com.petdiary.parrot.feature.care.RemindersScreen
 import com.petdiary.parrot.feature.me.MeScreen
 import com.petdiary.parrot.feature.food.FoodLibScreen
 import com.petdiary.parrot.feature.memories.MemoriesScreen
@@ -147,11 +146,9 @@ fun AppNavHost(appearance: String, onCycleAppearance: () -> Unit) {
                 MeScreen(
                     appearance = appearance,
                     onCycleAppearance = onCycleAppearance,
-                    onOpenReminders = { nav.navigate("reminders") },
                     onOpenExpenses = { nav.navigate("expenses") },
                 )
             }
-            composable("reminders") { RemindersScreen(onBack = { nav.popBackStack() }) }
             composable(
                 route = "place/{name}",
                 arguments = listOf(navArgument("name") { type = NavType.StringType }),

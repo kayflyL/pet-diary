@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 fun MeScreen(
     appearance: String,
     onCycleAppearance: () -> Unit,
-    onOpenReminders: () -> Unit = {},
     onOpenExpenses: () -> Unit = {},
 ) {
     Column(
@@ -43,7 +42,6 @@ fun MeScreen(
 
         SettingRow(Icons.Outlined.DarkMode, "外观", appearanceLabel(appearance) + " ›", onCycleAppearance)
         SettingRow(Icons.Outlined.Wallet, "花费统计", "›", onOpenExpenses)
-        SettingRow(Icons.Outlined.CalendarMonth, "提醒管理", "M6 ›", onOpenReminders)
         SettingRow(Icons.Outlined.Eco, "食物库", "M4 ›")
         SettingRow(Icons.Outlined.Eco, "食物库", "M4 ›")
         Spacer(Modifier.height(20.dp))

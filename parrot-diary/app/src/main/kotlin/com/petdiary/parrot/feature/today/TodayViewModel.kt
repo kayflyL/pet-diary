@@ -8,7 +8,6 @@ import com.petdiary.parrot.core.util.AgeFormatter
 import com.petdiary.parrot.data.DiaryRepository
 import com.petdiary.parrot.data.ExpenseRepository
 import com.petdiary.parrot.data.FoodRepository
-import com.petdiary.parrot.data.ReminderRepository
 import com.petdiary.parrot.data.PetRepository
 import com.petdiary.parrot.data.PlaceRepository
 import com.petdiary.parrot.data.WeightRepository
@@ -17,7 +16,6 @@ import com.petdiary.parrot.data.local.ExpenseLogEntity
 import com.petdiary.parrot.data.local.FeedLogEntity
 import com.petdiary.parrot.data.local.FoodEntity
 import com.petdiary.parrot.data.local.PetEntity
-import com.petdiary.parrot.data.local.ReminderEntity
 import com.petdiary.parrot.data.local.WeightLogEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
@@ -74,7 +72,6 @@ class TodayViewModel @Inject constructor(
     placeRepository: PlaceRepository,
     private val foodRepository: FoodRepository,
     private val diaryRepository: DiaryRepository,
-    private val reminderRepository: ReminderRepository,
     private val expenseRepository: ExpenseRepository,
 ) : ViewModel() {
 
@@ -83,14 +80,6 @@ class TodayViewModel @Inject constructor(
             foodRepository.ensureBuiltinImported()
             placeRepository.ensureHomePlace()
         }
-    }
-
-    /** 到期照护提醒（今天页「周期照护」卡片） */
-    val dueReminders: StateFlow<List<ReminderEntity>> = reminderRepository.observeDue()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    fun completeReminder(id: String) {
-        viewModelScope.launch { reminderRepository.completeOnce(id) }
     }
 
     val expenseCategories: List<Pair<String, String>> = ExpenseRepository.CATEGORIES

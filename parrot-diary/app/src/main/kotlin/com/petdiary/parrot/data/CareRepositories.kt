@@ -12,52 +12,6 @@ import kotlinx.coroutines.flow.Flow
 
 /** 周期照护提醒（驱虫/化毛/剪指甲…）+「记一次自动顺延」 */
 @Singleton
-class ReminderRepository @Inject constructor(private val dao: ReminderDao) {
-
-    data class Preset(val kind: String, val title: String, val intervalDays: Int)
-
-    /** 鸟用预设周期（APP设计文档.md §6 周期照护） */
-    val presets = listOf(
-        Preset("DEWORM_IN", "体内驱虫", 90),
-        Preset("DEWORM_OUT", "体外驱虫", 30),
-        Preset("HAIRBALL", "化毛", 14),
-        Preset("NAIL", "剪指甲", 30),
-        Preset("BATH", "洗澡", 15),
-        Preset("CAGE_CLEAN", "清理笼子", 7),
-    )
-
-    fun observeAll(): Flow<List<ReminderEntity>> = dao.observeAll()
-    fun observeEnabled(): Flow<List<ReminderEntity>> = dao.observeEnabled()
-
-    /** 「今天」页到期提醒：enabled 列表（界面层按 nextAt 过滤展示） */
-    fun observeDue(): Flow<List<ReminderEntity>> = dao.observeEnabled()
-
-    suspend fun add(kind: String, title: String, intervalDays: Int, nextAt: Long, petId: String? = null) {
-        dao.upsert(
-            ReminderEntity(
-                id = UUID.randomUUID().toString(),
-                petId = petId,
-                kind = kind,
-                title = title,
-                intervalDays = intervalDays,
-                nextAt = nextAt,
-                enabled = true,
-                createdAt = System.currentTimeMillis(),
-                updatedAt = System.currentTimeMillis(),
-            ),
-        )
-    }
-
-    suspend fun addFromPreset(preset: Preset, now: Long) = add(preset.kind, preset.title, preset.intervalDays, now + preset.intervalDays * 86_400_000L)
-
-    /** 记一次：完成本次并自动顺延下一周期 */
-    suspend fun completeOnce(id: String) = dao.completeAndReschedule(id, System.currentTimeMillis())
-
-    suspend fun delete(id: String) = dao.delete(id)
-}
-
-/** 养宠开销记账（调研：养宠记式分类+周月年统计） */
-@Singleton
 class ExpenseRepository @Inject constructor(private val dao: ExpenseDao) {
 
     companion object {

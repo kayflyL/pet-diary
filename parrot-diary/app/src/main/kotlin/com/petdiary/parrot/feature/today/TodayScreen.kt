@@ -78,7 +78,6 @@ fun TodayScreen(
 ) {
     val today = LocalDate.now()
     val ui by vm.todayUi(today).collectAsState()
-    val dueReminders by vm.dueReminders.collectAsState()
     val favoriteFoods by vm.favoriteFoods.collectAsState()
     val allFoods by vm.allFoods.collectAsState()
     var sheet by remember { mutableStateOf<String?>(null) }
@@ -180,47 +179,6 @@ fun TodayScreen(
                 } else {
                     items(ui.dayRecords, key = { it.kind + it.id }) { r ->
                         RecordRow(r)
-                    }
-                }
-                // 周期照护（原型：到期提醒卡片 + 记一次顺延）
-                if (dueReminders.isNotEmpty()) {
-                    item { Text("周期照护", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp)) }
-                    items(dueReminders, key = { it.id }) { rem ->
-                        val daysLeft = ((rem.nextAt - System.currentTimeMillis()) / 86_400_000L).toInt()
-                        val dueText = when {
-                            daysLeft < 0 -> "已过期 ${-daysLeft} 天"
-                            daysLeft == 0 -> "今天到期"
-                            else -> "还剩 $daysLeft 天"
-                        }
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp))
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(11.dp),
-                        ) {
-                            Box(
-                                modifier = Modifier.size(36.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(11.dp)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text("💊", fontSize = 15.sp)
-                            }
-                            Column(Modifier.weight(1f)) {
-                                Text(rem.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    "每 ${rem.intervalDays} 天 · $dueText",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Button(
-                                onClick = { vm.completeReminder(rem.id) },
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                            ) {
-                                Text("记一次", fontSize = 12.sp)
-                            }
-                        }
                     }
                 }
                 item { Spacer(Modifier.height(90.dp)) }

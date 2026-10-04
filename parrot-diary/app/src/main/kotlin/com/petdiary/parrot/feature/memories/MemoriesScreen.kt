@@ -155,8 +155,13 @@ fun MemoriesScreen(
                             .verticalScroll(scrollState)
                             .padding(horizontal = 18.dp),
                     ) {
-                        QuoteBlock()
                         StoryWall(ui.stories, scrollState)
+                        Text(
+                            "故事 = 同一天的照片与日记自动打包 · 左侧竖排月份为时间轨道 · 重复照片自动隐藏",
+                            fontSize = 10.5.sp,
+                            color = SubInk,
+                            modifier = Modifier.padding(top = 10.dp),
+                        )
                         Spacer(Modifier.height(20.dp))
                     }
                     1 -> PhotoMap(
@@ -181,33 +186,6 @@ fun MemoriesScreen(
         viewer?.let { state ->
             PhotoViewer(state = state, onDismiss = { viewer = null })
         }
-    }
-}
-
-/** 引言块：StoryTeller 情感设计的点睛（原型 .mquote，纯排版无框线） */
-@Composable
-private fun QuoteBlock() {
-    Column(Modifier.padding(top = 14.dp, bottom = 16.dp)) {
-        Text(
-            "把照片重新变回事件",
-            fontSize = 16.5.sp,
-            fontWeight = FontWeight.ExtraBold,
-            letterSpacing = (-0.3).sp,
-            color = PaperInk,
-        )
-        Text(
-            "每一次称重、每一顿饭、每一张照片，都是你们共同经历的情感元数据。地图不只是定位，是讲故事时重踏的足迹。",
-            fontSize = 12.5.sp,
-            color = SubInk,
-            lineHeight = 21.sp,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-        Text(
-            "—— 设计理念致敬 Nokia Storyteller",
-            fontSize = 10.5.sp,
-            color = SubInk.copy(alpha = 0.75f),
-            modifier = Modifier.padding(top = 5.dp),
-        )
     }
 }
 
@@ -259,7 +237,7 @@ private fun StoryWall(stories: List<StoryUi>, scrollState: ScrollState) {
             }
         }
         // 双列瀑布流：按全局序号循环高度比，两列交错
-        val ratios = listOf(1f, 1.28f, 0.9f, 1.15f)
+        val ratios = listOf(0.92f, 1.2f)
         val columns = listOf(
             stories.filterIndexed { i, _ -> i % 2 == 0 },
             stories.filterIndexed { i, _ -> i % 2 == 1 },

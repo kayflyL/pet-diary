@@ -22,6 +22,8 @@ data class StoryUi(
     val photoCount: Int,
     val texts: List<String>,
     val firstPhotoPath: String?,
+    /** 当天全部照片（点瓦片进全屏查看器连看） */
+    val photos: List<PhotoUi> = emptyList(),
 )
 
 data class PhotoUi(
@@ -57,7 +59,7 @@ class MemoriesViewModel @Inject constructor(
         diaryRepository.observeGeotaggedNamed(),
     ) { entries, media, pets, geo ->
         val nameById = pets.associate { it.id to it.name }
-        val mediaByEntry = media.groupBy { it.entryId }
+        val geoById = geo.associateBy { it.id }
 
         val stories = entries
             .sortedByDescending { it.happenedAt }
@@ -72,10 +74,22 @@ class MemoriesViewModel @Inject constructor(
                     photoCount = dayMedia.size,
                     texts = list.map { it.text },
                     firstPhotoPath = dayMedia.firstOrNull()?.path,
+                    photos = dayMedia.sortedByDescending { it.createdAt }.map { m ->
+                        val entry = list.firstOrNull { it.id == m.entryId }
+                        PhotoUi(
+                            id = m.id,
+                            path = m.path,
+                            petName = nameById[entry?.petId].orEmpty(),
+                            date = date,
+                            lat = m.lat,
+                            lng = m.lng,
+                            placeName = geoById[m.id]?.placeName,
+                            takenAt = m.takenAt ?: m.createdAt,
+                        )
+                    },
                 )
             }
 
-        val geoById = geo.associateBy { it.id }
         val photos = media
             .sortedByDescending { it.createdAt }
             .map { m ->

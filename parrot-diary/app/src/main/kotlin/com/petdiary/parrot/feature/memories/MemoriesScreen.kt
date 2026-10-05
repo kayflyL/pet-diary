@@ -104,6 +104,7 @@ fun MemoriesScreen(
     vm: MemoriesViewModel = hiltViewModel(),
 ) {
     val ui by vm.ui.collectAsState()
+    val context = LocalContext.current
     var seg by remember { mutableIntStateOf(0) }
     val scrollState = rememberScrollState()
     var viewer by remember { mutableStateOf<ViewerState?>(null) }
@@ -129,7 +130,7 @@ fun MemoriesScreen(
                         fontWeight = FontWeight.Bold,
                     )
                     Row(Modifier.padding(top = 4.dp)) {
-                        listOf("故事", "地图", "照片").forEachIndexed { i, label ->
+                        listOf("故事", "地图").forEachIndexed { i, label ->
                             Text(
                                 label,
                                 fontSize = 27.sp,
@@ -156,31 +157,25 @@ fun MemoriesScreen(
                             .verticalScroll(scrollState)
                             .padding(horizontal = 18.dp),
                     ) {
-                        StoryWall(ui.stories, scrollState)
+                        StoryWall(ui.stories, scrollState) { story ->
+                            if (story.photos.isNotEmpty()) viewer = ViewerState(story.photos, 0)
+                            else android.widget.Toast.makeText(context, "纯日记故事：日记详情开发中", android.widget.Toast.LENGTH_SHORT).show()
+                        }
                         Text(
-                            "故事 = 同一天的照片与日记自动打包 · 左侧竖排月份为时间轨道 · 重复照片自动隐藏",
+                            "故事 = 同一天的照片与日记自动打包 · 点瓦片直接全屏看图 · 左侧竖排月份为时间轨道",
                             fontSize = 10.5.sp,
                             color = SubInk,
                             modifier = Modifier.padding(top = 10.dp),
                         )
                         Spacer(Modifier.height(20.dp))
                     }
-                    1 -> PhotoMap(
+                    else -> PhotoMap(
                         geotagged = ui.geotagged,
                         modifier = Modifier.weight(1f),
                         onOpenViewer = { viewer = it },
                         onOpenPlace = onOpenPlace,
                         onOpenPlaces = onOpenPlaces,
                     )
-                    else -> Column(
-                        Modifier
-                            .fillMaxSize()
-                            .verticalScroll(scrollState)
-                            .padding(horizontal = 18.dp),
-                    ) {
-                        PhotoWall(ui.photos) { viewer = it }
-                        Spacer(Modifier.height(20.dp))
-                    }
                 }
             }
         }
@@ -192,7 +187,7 @@ fun MemoriesScreen(
 
 /** 故事墙：左侧月份竖轨 + 双列瀑布流（StoryTeller DNA ②）；竖轨可点、随滚动联动高亮 */
 @Composable
-private fun StoryWall(stories: List<StoryUi>, scrollState: ScrollState) {
+private fun StoryWall(stories: List<StoryUi>, scrollState: ScrollState, onOpenStory: (StoryUi) -> Unit) {
     if (stories.isEmpty()) {
         Text(
             "还没有故事。在「今天」写一条日记，同一天的照片和日记会自动打包成一个故事。",
@@ -257,6 +252,7 @@ private fun StoryWall(stories: List<StoryUi>, scrollState: ScrollState) {
                         StoryTile(
                             story = story,
                             ratio = ratio,
+                            onOpen = { onOpenStory(story) },
                             onAnchor = {
                                 if (firstOfMonth[story.date.withDayOfMonth(1)] == story.date) {
                                     monthTops[story.date.withDayOfMonth(1)] =
@@ -273,13 +269,19 @@ private fun StoryWall(stories: List<StoryUi>, scrollState: ScrollState) {
 
 /** 瀑布流故事瓦片：照片全出血 + 压字（原型 .stile） */
 @Composable
-private fun StoryTile(story: StoryUi, ratio: Float, onAnchor: (androidx.compose.ui.layout.LayoutCoordinates) -> Unit) {
+private fun StoryTile(
+    story: StoryUi,
+    ratio: Float,
+    onOpen: () -> Unit,
+    onAnchor: (androidx.compose.ui.layout.LayoutCoordinates) -> Unit,
+) {
     Box(
         Modifier
             .fillMaxWidth()
             .aspectRatio(ratio)
             .clip(RoundedCornerShape(16.dp))
             .background(GreenInkSoft)
+            .clickable(onClick = onOpen)
             .onGloballyPositioned { onAnchor(it) },
     ) {
         if (story.firstPhotoPath != null) {
@@ -318,48 +320,6 @@ private fun StoryTile(story: StoryUi, ratio: Float, onAnchor: (androidx.compose.
                 color = Color.White.copy(alpha = 0.85f),
                 modifier = Modifier.padding(top = 1.dp),
             )
-        }
-    }
-}
-
-/** 照片墙：按月分组的方片网格，点任意一张全屏看大图（左右滑看全部） */
-@Composable
-private fun PhotoWall(photos: List<PhotoUi>, onOpenViewer: (ViewerState) -> Unit) {
-    if (photos.isEmpty()) {
-        Text("随手拍的照片会按月聚在这里", style = MaterialTheme.typography.bodyMedium, color = SubInk)
-        return
-    }
-    val byMonth = photos.groupBy { it.date.withDayOfMonth(1) }.toSortedMap(compareByDescending { it.year * 100 + it.monthValue })
-    byMonth.forEach { (month, list) ->
-        Text(
-            "${month.year} 年 ${month.monthValue} 月 · ${list.size} 张",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 14.dp, bottom = 8.dp),
-        )
-        val rows = list.chunked(3)
-        rows.forEach { rowPhotos ->
-            Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                rowPhotos.forEach { p ->
-                    AsyncImage(
-                        model = java.io.File(p.path),
-                        contentDescription = p.petName,
-                        modifier = Modifier
-                            .weight(1f)
-                            .aspectRatio(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(GreenInkSoft)
-                            .clickable {
-                                val start = photos.indexOfFirst { it.id == p.id }.coerceAtLeast(0)
-                                onOpenViewer(ViewerState(photos, start))
-                            },
-                        contentScale = ContentScale.Crop,
-                    )
-                }
-                repeat(3 - rowPhotos.size) {
-                    Spacer(Modifier.weight(1f).aspectRatio(1f))
-                }
-            }
         }
     }
 }

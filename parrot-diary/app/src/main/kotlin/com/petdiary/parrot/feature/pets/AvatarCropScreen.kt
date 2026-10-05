@@ -3,27 +3,20 @@ package com.petdiary.parrot.feature.pets
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,27 +24,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Image
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -60,8 +48,6 @@ import com.petdiary.parrot.data.PetRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
-import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -75,34 +61,44 @@ class AvatarCropViewModel @Inject constructor(
 ) : ViewModel() {
     val petId: String = checkNotNull(savedStateHandle["petId"])
 
-    /** 裁剪结果保存到私有媒体目录，并写入该鸟档案的 avatarPath（列表/英雄卡/详情复用同图） */
-    fun saveCropped(bitmap: android.graphics.Bitmap, onSaved: () -> Unit) {
+    /** avatar=1:1 头像；hero=首页英雄卡宽幅取景图（所见即所得） */
+    val mode: String = savedStateHandle["mode"] ?: "avatar"
+
+    /** 裁剪结果保存到私有媒体目录；avatar 模式带焦点，hero 模式所见即所得存整图 */
+    fun saveCropped(bitmap: android.graphics.Bitmap, focalX: Float?, focalY: Float?, onSaved: () -> Unit) {
         viewModelScope.launch {
+            val name = if (mode == "hero") "hero_$petId.jpg" else "avatar_$petId.jpg"
             val file = withContext(Dispatchers.IO) {
                 val dir = java.io.File(context.filesDir, "media").apply { mkdirs() }
-                java.io.File(dir, "avatar_$petId.jpg").also { out ->
+                java.io.File(dir, name).also { out ->
                     out.outputStream().use { stream ->
                         bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, stream)
                     }
                 }
             }
-            petRepository.setAvatar(petId, file.absolutePath)
+            if (mode == "hero") {
+                petRepository.setHeroPath(petId, file.absolutePath)
+            } else {
+                petRepository.setAvatar(petId, file.absolutePath, focalX, focalY)
+            }
             withContext(Dispatchers.Main) { onSaved() }
         }
     }
 }
 
-/** 裁剪头像页：选图（相册，进入即弹）→ 拖动定位/双指缩放 → ✓ 保存 1:1 方形裁切 */
+/**
+ * 裁剪页（通用）：选图（相册，进入即弹）→ 拖动定位/双指缩放 → ✓ 保存。
+ * avatar 模式裁 1:1 方形头像；hero 模式裁 1.9:1 宽幅，作为首页英雄卡背景（所见即所得）。
+ */
 @Composable
 fun AvatarCropScreen(onDone: () -> Unit, vm: AvatarCropViewModel = hiltViewModel()) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val isHero = vm.mode == "hero"
+    val frameRatio = if (isHero) 1.9f else 1f
     var sourceUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var image by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
-    val graphicsLayer = rememberGraphicsLayer()
-    var saving by remember { mutableStateOf(false) }
     var frameSize by remember { mutableStateOf(android.util.Size(0, 0)) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -132,7 +128,14 @@ fun AvatarCropScreen(onDone: () -> Unit, vm: AvatarCropViewModel = hiltViewModel
         offset = Offset.Zero
     }
 
-    Column(Modifier.fillMaxSize().background(Color(0xFF0B0D0C))) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0B0D0C))
+            .clickable(enabled = image == null) {
+                picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            },
+    ) {
         // 顶栏
         Row(
             Modifier
@@ -149,74 +152,63 @@ fun AvatarCropScreen(onDone: () -> Unit, vm: AvatarCropViewModel = hiltViewModel
                     .padding(10.dp),
             )
             Text(
-                "裁剪头像",
+                if (isHero) "调整首页卡片取景" else "裁剪头像",
                 color = Color.White,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )
         }
-        // 裁剪框（1:1）：只录制里面的图片内容，遮罩画在外面不进入裁剪结果
+        // 裁剪框：所见即所得，框内即保存范围
         Box(
             Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f)
-                .clipToBounds(),
+                .aspectRatio(frameRatio)
+                .clipToBounds()
+                .border(3.dp, Color.White)
+                .onGloballyPositioned { frameSize = android.util.Size(it.size.width, it.size.height) }
+                .pointerInput(image) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        val bmp = image ?: return@detectTransformGestures
+                        // 可拖余量 = Crop 填充溢出 + 缩放溢出（Crop 溢出漏算会导致 scale=1 时拖不动）
+                        val k = maxOf(size.width.toFloat() / bmp.width, size.height.toFloat() / bmp.height)
+                        val newScale = (scale * zoom).coerceIn(1f, 6f)
+                        val maxX = (bmp.width * k * newScale - size.width) / 2f
+                        val maxY = (bmp.height * k * newScale - size.height) / 2f
+                        scale = newScale
+                        offset = Offset(
+                            (offset.x + pan.x).coerceIn(-maxX, maxX),
+                            (offset.y + pan.y).coerceIn(-maxY, maxY),
+                        )
+                    }
+                },
         ) {
             image?.let { bmp ->
-                Box(
-                    Modifier
+                Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
                         .fillMaxSize()
-                        .drawWithContent {
-                            graphicsLayer.record { this@drawWithContent.drawContent() }
-                            drawContent()
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = offset.x
+                            translationY = offset.y
                         },
-                ) {
-                    Image(
-                        bitmap = bmp.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                                translationX = offset.x
-                                translationY = offset.y
-                            },
-                    )
-                }
-                // 遮罩：方框外压暗 + 白色边框
-                Canvas(
-                    Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen },
-                ) {
-                    drawRect(Color(0x99000000))
-                    val side = min(size.width, size.height)
-                    drawRect(
-                        color = Color.Transparent,
-                        topLeft = Offset((size.width - side) / 2f, (size.height - side) / 2f),
-                        size = androidx.compose.ui.geometry.Size(side, side),
-                        blendMode = androidx.compose.ui.graphics.BlendMode.Clear,
-                    )
-                    drawRect(
-                        color = Color.White,
-                        topLeft = Offset((size.width - side) / 2f, (size.height - side) / 2f),
-                        size = androidx.compose.ui.geometry.Size(side, side),
-                        style = Stroke(width = 5f),
-                    )
-                }
+                )
             } ?: Box(
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f),
+                Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("选择一张照片开始裁剪", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
+                Text(
+                    "轻触此处选择一张照片",
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 14.sp,
+                )
             }
         }
-        // 保存：由方框屏幕坐标反算源图裁切区域
+        // 保存：由框屏幕坐标反算源图裁切区域（框比例即裁剪比例）
         Button(
             onClick = {
                 val bmp = image ?: return@Button
@@ -236,9 +228,14 @@ fun AvatarCropScreen(onDone: () -> Unit, vm: AvatarCropViewModel = hiltViewModel
                 val ch = (ey0 - sy0).coerceIn(1, bmp.height)
                 val x0 = sx0.coerceIn(0, (bmp.width - cw).coerceAtLeast(0))
                 val y0 = sy0.coerceIn(0, (bmp.height - ch).coerceAtLeast(0))
-                val side = min(cw, ch)
-                val cropped = android.graphics.Bitmap.createBitmap(bmp, x0, y0, side, side)
-                vm.saveCropped(cropped) { onDone() }
+                val cropped = android.graphics.Bitmap.createBitmap(bmp, x0, y0, cw, ch)
+                if (isHero) {
+                    vm.saveCropped(cropped, null, null) { onDone() }
+                } else {
+                    val fx = ((x0 + cw / 2f) / bmp.width).coerceIn(0f, 1f)
+                    val fy = ((y0 + ch / 2f) / bmp.height).coerceIn(0f, 1f)
+                    vm.saveCropped(cropped, fx, fy) { onDone() }
+                }
             },
             enabled = image != null,
             modifier = Modifier
@@ -250,7 +247,8 @@ fun AvatarCropScreen(onDone: () -> Unit, vm: AvatarCropViewModel = hiltViewModel
             Text("✓ 用这张", fontWeight = FontWeight.Bold)
         }
         Text(
-            "拖动定位 · 双指缩放 · 方框内为保存范围",
+            if (isHero) "拖动定位 · 双指缩放 · 框内就是首页卡片显示的画面"
+            else "拖动定位 · 双指缩放 · 框内为头像保存范围",
             color = Color.White.copy(alpha = 0.55f),
             fontSize = 11.sp,
             modifier = Modifier

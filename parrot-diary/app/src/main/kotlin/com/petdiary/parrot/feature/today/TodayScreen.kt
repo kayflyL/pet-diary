@@ -57,6 +57,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -264,7 +265,17 @@ private fun HeroCard(
     onSelect: (String) -> Unit,
     onOpenDetail: () -> Unit,
 ) {
-    val bgPhoto = birds.firstOrNull { it.id == ui.selectedBirdId }?.avatarPath ?: photoPath
+    val selBird = birds.firstOrNull { it.id == ui.selectedBirdId }
+    val bgPhoto = selBird?.avatarPath ?: photoPath
+    // 宽幅背景按头像焦点取景；无焦点时默认偏上（鸟头多在照片上半）
+    val heroAlignment = if (selBird?.avatarFocalX != null && selBird.avatarFocalY != null) {
+        BiasAlignment(
+            (selBird.avatarFocalX * 2f - 1f).coerceIn(-1f, 1f),
+            (selBird.avatarFocalY * 2f - 1f).coerceIn(-1f, 1f),
+        )
+    } else {
+        BiasAlignment(0f, -0.5f)
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -281,6 +292,7 @@ private fun HeroCard(
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
+                alignment = heroAlignment,
             )
         }
         // 顶层渐变：上深下透明再转深，保证头像与文字可读

@@ -23,6 +23,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -30,6 +31,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +51,7 @@ fun BirdDetailScreen(
     onBack: () -> Unit,
     onOpenFoodLib: (String) -> Unit = {},
     onSetAvatar: () -> Unit = {},
+    onSetHero: () -> Unit = {},
     vm: BirdDetailViewModel = hiltViewModel(),
 ) {
     val pet by vm.bird.collectAsState()
@@ -54,6 +59,7 @@ fun BirdDetailScreen(
     val count by vm.recordCount.collectAsState()
     val weights by vm.weights.collectAsState()
     val ui = detailUi(pet, latest, count, LocalDate.now().toEpochDay())
+    var showAvatarSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -87,7 +93,7 @@ fun BirdDetailScreen(
                         .size(62.dp)
                         .clip(CircleShape)
                         .background(ui.accent, CircleShape)
-                        .clickable(enabled = onSetAvatar != {}) { onSetAvatar() },
+                        .clickable(enabled = onSetAvatar != {}) { showAvatarSheet = true },
                     contentAlignment = Alignment.Center,
                 ) {
                     if (pet?.avatarPath != null) {
@@ -212,6 +218,43 @@ fun BirdDetailScreen(
             }
             ui.notes?.let { InfoCard("备注") { Text(it, style = MaterialTheme.typography.bodyMedium) } }
             Spacer(Modifier.height(40.dp))
+        }
+    }
+
+    if (showAvatarSheet) {
+        ModalBottomSheet(onDismissRequest = { showAvatarSheet = false }) {
+            Column(Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
+                Text(
+                    "头像与首页卡片",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                )
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            showAvatarSheet = false
+                            onSetAvatar()
+                        }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                ) {
+                    Text("换头像", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                    Text("用于列表、地图钉和档案页", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            showAvatarSheet = false
+                            onSetHero()
+                        }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                ) {
+                    Text("调整首页卡片取景", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                    Text("宽幅裁剪，决定今天页英雄卡显示的画面", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
     }
 }

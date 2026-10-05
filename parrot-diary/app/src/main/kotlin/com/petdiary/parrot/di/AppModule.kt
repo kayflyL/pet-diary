@@ -29,7 +29,7 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): ParrotDiaryDatabase =
         Room.databaseBuilder(context, ParrotDiaryDatabase::class.java, ParrotDiaryDatabase.NAME)
-            .addMigrations(ParrotDiaryDatabase.MIGRATION_1_2)
+            .addMigrations(ParrotDiaryDatabase.MIGRATION_1_2, ParrotDiaryDatabase.MIGRATION_2_3, ParrotDiaryDatabase.MIGRATION_3_4)
             .build()
 
     @Provides fun petDao(db: ParrotDiaryDatabase): PetDao = db.petDao()

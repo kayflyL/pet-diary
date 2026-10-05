@@ -124,8 +124,14 @@ class FoodRepository @Inject constructor(
 
 @Singleton
 class PetRepository @Inject constructor(private val petDao: PetDao) {
-    suspend fun setAvatar(petId: String, path: String) {
-        petDao.getById(petId)?.let { petDao.upsert(it.copy(avatarPath = path)) }
+    suspend fun setAvatar(petId: String, path: String, focalX: Float? = null, focalY: Float? = null) {
+        petDao.getById(petId)?.let {
+            petDao.upsert(it.copy(avatarPath = path, avatarFocalX = focalX, avatarFocalY = focalY))
+        }
+    }
+
+    suspend fun setHeroPath(petId: String, path: String) {
+        petDao.getById(petId)?.let { petDao.upsert(it.copy(heroPath = path)) }
     }
     fun observeActive(): Flow<List<PetEntity>> = petDao.observeActive()
     fun observeById(id: String): Flow<PetEntity?> = petDao.observeById(id)

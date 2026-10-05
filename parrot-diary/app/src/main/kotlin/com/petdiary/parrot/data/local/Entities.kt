@@ -26,6 +26,9 @@ data class PetEntity(
     val birthDateEpochDay: Long? = null,
     val gotchaDateEpochDay: Long? = null,
     val avatarPath: String? = null,
+    val avatarFocalX: Float? = null,          // 头像焦点 0..1（英雄卡宽幅背景取景对准此点）
+    val avatarFocalY: Float? = null,
+    val heroPath: String? = null,               // 首页英雄卡宽幅取景图（用户手裁，所见即所得）
     val personalityTagsJson: String? = null,  // ["粘人","话痨"]
     val accentIndex: Int = 0,                 // 每鸟强调色 0..5
     val notes: String? = null,

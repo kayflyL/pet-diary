@@ -171,8 +171,11 @@ fun AppNavHost(appearance: String, onCycleAppearance: () -> Unit) {
                 AddEditBirdScreen(onDone = { nav.popBackStack() })
             }
             composable(
-                route = "bird/avatar/{petId}",
-                arguments = listOf(navArgument("petId") { type = NavType.StringType }),
+                route = "bird/avatar/{petId}?mode={mode}",
+                arguments = listOf(
+                    navArgument("petId") { type = NavType.StringType },
+                    navArgument("mode") { type = NavType.StringType; defaultValue = "avatar" },
+                ),
             ) {
                 AvatarCropScreen(onDone = { nav.popBackStack() })
             }
@@ -181,6 +184,7 @@ fun AppNavHost(appearance: String, onCycleAppearance: () -> Unit) {
                 BirdDetailScreen(
                     onEdit = { nav.navigate("bird/edit?petId=$petId") },
                     onSetAvatar = { nav.navigate("bird/avatar/$petId") },
+                    onSetHero = { nav.navigate("bird/avatar/$petId?mode=hero") },
                     onBack = { nav.popBackStack() },
                     onOpenFoodLib = { nav.navigate("food/$petId") },
                 )

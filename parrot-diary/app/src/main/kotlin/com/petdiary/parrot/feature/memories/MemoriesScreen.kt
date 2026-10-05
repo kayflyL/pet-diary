@@ -74,6 +74,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.petdiary.parrot.feature.common.FlipText
+import com.petdiary.parrot.feature.common.fluidEnter
+import com.petdiary.parrot.feature.common.tiltPress
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -246,6 +249,7 @@ private fun StoryWall(stories: List<StoryUi>, scrollState: ScrollState, onOpenSt
                         StoryTile(
                             story = story,
                             ratio = ratio,
+                            index = stories.indexOf(story),
                             onOpen = { onOpenStory(story) },
                             onAnchor = {
                                 if (firstOfMonth[story.date.withDayOfMonth(1)] == story.date) {
@@ -266,6 +270,7 @@ private fun StoryWall(stories: List<StoryUi>, scrollState: ScrollState, onOpenSt
 private fun StoryTile(
     story: StoryUi,
     ratio: Float,
+    index: Int,
     onOpen: () -> Unit,
     onAnchor: (androidx.compose.ui.layout.LayoutCoordinates) -> Unit,
 ) {
@@ -273,8 +278,10 @@ private fun StoryTile(
         Modifier
             .fillMaxWidth()
             .aspectRatio(ratio)
+            .fluidEnter(index)
             .clip(RoundedCornerShape(16.dp))
             .background(GreenInkSoft)
+            .tiltPress()
             .clickable(onClick = onOpen)
             .onGloballyPositioned { onAnchor(it) },
     ) {

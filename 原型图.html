@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鹦鹉日记 · 原型 v3.9 · 视觉升级</title>
+<title>鹦鹉日记 · 原型 v4.0 · 视觉升级</title>
 <style>
 :root{
   --bg:#FAFAF9; --card:#FFFFFF; --surface:#F4F4F3; --ink:#191A1C; --sub:#85878C;
@@ -31,6 +31,19 @@ body{background:#141618;font-family:-apple-system,'MiSans','HarmonyOS Sans SC','
 #m-map .fs-slider{margin:0 12px 132px}
 .places-chip{position:absolute;top:12px;left:12px;background:rgba(16,19,18,.72);color:#fff;font-size:10.5px;padding:4px 10px;border-radius:999px;z-index:6;cursor:pointer}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+/* ── WP Metro 动效（v4.0）：turnstile 前进转场 / continuum 详情入场 / pivot 横滑 / live tile 翻面 ── */
+@keyframes wp-turnstile{from{opacity:0;transform:perspective(1200px) rotateY(-20deg) translateX(36px)}to{opacity:1;transform:none}}
+@keyframes wp-cont-img{from{transform:scale(1.07)}to{transform:none}}
+@keyframes wp-cont-title{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+@keyframes wp-pivot{from{opacity:.35;transform:translateX(var(--pv,26px))}to{opacity:1;transform:none}}
+@keyframes wp-flipx{0%{transform:rotateX(0)}48%{transform:rotateX(90deg);opacity:0}52%{transform:rotateX(-90deg);opacity:0}100%{transform:none;opacity:1}}
+.screen.active.wp-push{animation:wp-turnstile .32s cubic-bezier(.2,.7,.3,1)}
+.screen.active.wp-cont{animation:wp-turnstile .26s cubic-bezier(.2,.7,.3,1)}
+.screen.active.wp-cont .place-hero{animation:wp-cont-img .4s cubic-bezier(.2,.7,.3,1)}
+.screen.active.wp-cont .pn{animation:wp-cont-title .34s cubic-bezier(.2,.7,.3,1) .05s both}
+.wp-pivot-l{animation:wp-pivot .28s cubic-bezier(.2,.7,.3,1);--pv:26px}
+.wp-pivot-r{animation:wp-pivot .28s cubic-bezier(.2,.7,.3,1);--pv:-26px}
+.st-flip{animation:wp-flipx .84s cubic-bezier(.4,0,.2,1)}
 .screen::-webkit-scrollbar{display:none}
 h1{font-size:20px;font-weight:700;letter-spacing:-.2px}
 .ic{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
@@ -783,7 +796,11 @@ function applyTheme(t){document.getElementById('phone').dataset.theme=t;
   document.getElementById('themeLabel').textContent=t==='dark'?'深色 ›':'浅色 ›';}
 function toggleTheme(){ti=1-ti;applyTheme(themes[ti]);}
 function cycleTheme(){ti=1-ti;applyTheme(themes[ti]);toast('外观：'+themes[ti]+'（正式版含"跟随系统"）');}
-function nav(id,btn){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');cur=id;
+function nav(id,btn){const pushes={'s-place':'wp-cont','s-places':'wp-push','s-food':'wp-push','s-cost':'wp-push','s-backup':'wp-push'};
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active','wp-push','wp-cont'));
+  const __el=document.getElementById(id);__el.classList.add('active');
+  if(pushes[id]){__el.classList.remove(pushes[id]);void __el.offsetWidth;__el.classList.add(pushes[id]);}
+  cur=id;
   document.querySelectorAll('#tabbar button').forEach(b=>b.classList.remove('on'));
   const map={'s-today':0,'s-mem':1,'s-birds':2,'s-me':3};if(map[id]!==undefined)document.querySelectorAll('#tabbar button')[map[id]].classList.add('on');
   document.getElementById('fab').style.display=['s-today','s-mem','s-birds'].includes(id)?'flex':'none';}
@@ -791,6 +808,28 @@ function openSheet(name){document.getElementById('sw').classList.add('show');['h
   document.getElementById('fab').style.display='none';}
 function closeSheet(){document.getElementById('sw').classList.remove('show');
   document.getElementById('fab').style.display=['s-today','s-mem','s-birds'].includes(cur)?'flex':'none';}
+// ── 回忆页签 pivot 横滑（WP Pivot 手感：横扫切换 故事⇄地图）
+(function(){const mem=document.getElementById('s-mem');let x0=null,y0=null;
+ function pivotTo(i){const tabs=mem.querySelectorAll('.mt');const target=i?'m-map':'m-story';const cls=i?'wp-pivot-l':'wp-pivot-r';
+  mseg(tabs[i],target);const pane=document.getElementById(target);pane.classList.remove('wp-pivot-l','wp-pivot-r');void pane.offsetWidth;pane.classList.add(cls);}
+ mem.addEventListener('pointerdown',e=>{if(e.target.closest('#pmap,#ts-panel,.qp,.ts-track')){x0=null;return}x0=e.clientX;y0=e.clientY});
+ mem.addEventListener('pointerup',e=>{if(x0===null)return;const dx=e.clientX-x0;const dy=Math.abs(e.clientY-y0);x0=null;
+  if(Math.abs(dx)<56||dy>40)return;const seg=mem.querySelector('#m-map').classList.contains('hidden')?0:1;
+  pivotTo(dx<0?(seg?0:1):(seg?1:0));});
+})();
+// ── Live tile 英雄卡：统计每 4s 翻面轮播（glanceable，不点也传递信息）
+let heroBase=null,liveAlt=false;
+function heroLiveSync(){heroBase=[
+ [document.getElementById('hero-w').textContent,'最新体重'],
+ [document.getElementById('hero-days').textContent,'陪伴时间'],
+ [document.getElementById('hero-cnt').textContent,'记一笔数量']];}
+heroLiveSync();
+setInterval(()=>{if(document.getElementById('s-today').classList.contains('hidden'))return;
+ liveAlt=!liveAlt;
+ const faces=liveAlt?[['3 次','今日喂食'],['¥238','本月开销'],['4 张','本周照片']]:heroBase;
+ document.querySelectorAll('#s-today .hero .stats .st').forEach((el,i)=>{el.classList.remove('st-flip');void el.offsetWidth;el.classList.add('st-flip');
+  setTimeout(()=>{el.querySelector('b').textContent=faces[i][0];el.querySelector('div').textContent=faces[i][1];},400);});
+},4000);
 function foodForm(name){openSheet('food');
   document.getElementById('food-title').textContent=name?'编辑自定义食物':'自定义食物';
   document.getElementById('food-name').value=name||'';
@@ -811,7 +850,7 @@ function switchBird(el,name,species,meta,wt,days,cnt,ch){document.querySelectorA
   document.getElementById('hero-w').textContent=wt+' g';
   document.getElementById('hero-days').textContent=days;
   document.getElementById('hero-cnt').textContent=cnt;
-  document.querySelector('.hero .mono').textContent=ch;toast('已切换到：'+name);}
+  document.querySelector('.hero .mono').textContent=ch;heroLiveSync();liveAlt=false;toast('已切换到：'+name);}
 function calModeNext(){mode=(mode+1)%3;
   document.getElementById('cal-week').classList.toggle('hidden',mode!==0);
   document.getElementById('cal-month').classList.toggle('hidden',mode!==1);

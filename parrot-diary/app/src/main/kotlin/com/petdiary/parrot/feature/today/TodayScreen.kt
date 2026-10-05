@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
@@ -66,6 +67,9 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import coil3.compose.AsyncImage
+import com.petdiary.parrot.feature.common.FlipText
+import com.petdiary.parrot.feature.common.fluidEnter
+import com.petdiary.parrot.feature.common.tiltPress
 import androidx.hilt.navigation.compose.hiltViewModel
 
 import com.petdiary.parrot.core.designsystem.BirdAccents
@@ -185,8 +189,8 @@ fun TodayScreen(
                         )
                     }
                 } else {
-                    items(ui.dayRecords, key = { it.kind + it.id }) { r ->
-                        RecordRow(r)
+                    itemsIndexed(ui.dayRecords, key = { _, r -> r.kind + r.id }) { i, r ->
+                        RecordRow(r, Modifier.fluidEnter(i))
                     }
                 }
                 item { Spacer(Modifier.height(90.dp)) }
@@ -267,6 +271,7 @@ private fun HeroCard(
             .height(206.dp)
             .clip(RoundedCornerShape(24.dp))
             .background(Color(0xFF123A2C))
+            .tiltPress()
             .clickable(onClick = onOpenDetail),
     ) {
         // 第二层：这只鸟的头像照片（未设置时退回最新日记照片）
@@ -339,7 +344,9 @@ private fun GlassStat(value: String, label: String) {
             .padding(horizontal = 10.dp, vertical = 7.dp),
     ) {
         Column {
-            Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            FlipText(value) { v ->
+                Text(v, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
             Text(label, fontSize = 10.sp, color = Color.White.copy(alpha = 0.85f))
         }
     }
@@ -585,9 +592,9 @@ private fun NavChip(label: String, onClick: () -> Unit) {
 
 /** 当天时间线行：称重/喂食/日记统一（喂食带最爱徽章） */
 @Composable
-private fun RecordRow(r: com.petdiary.parrot.feature.today.DayRecordUi) {
+private fun RecordRow(r: com.petdiary.parrot.feature.today.DayRecordUi, modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {

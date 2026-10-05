@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.Button
@@ -49,6 +50,7 @@ import androidx.lifecycle.viewModelScope
 import com.petdiary.parrot.data.FoodRepository
 import com.petdiary.parrot.data.local.FoodEntity
 import com.petdiary.parrot.data.local.PetFoodPrefEntity
+import com.petdiary.parrot.feature.common.fluidEnter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -199,8 +201,8 @@ fun FoodLibScreen(petId: String, onBack: () -> Unit, vm: FoodLibViewModel = hilt
                 )
 
             LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                items(visible, key = { it.id }) { r ->
-                    FoodRow(r, onMark = { level -> vm.mark(r.id, level) }, onOpen = { editing = r })
+                itemsIndexed(visible, key = { _, r -> r.id }) { i, r ->
+                    FoodRow(r, modifier = Modifier.fluidEnter(i), onMark = { level -> vm.mark(r.id, level) }, onOpen = { editing = r })
                 }
                 item {
                     Box(
@@ -338,9 +340,9 @@ private fun FoodFormSheet(
 }
 
 @Composable
-private fun FoodRow(r: FoodRowUi, onMark: (String) -> Unit, onOpen: () -> Unit) {
+private fun FoodRow(r: FoodRowUi, modifier: Modifier = Modifier, onMark: (String) -> Unit, onOpen: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(vertical = 6.dp),
+        modifier = modifier.fillMaxWidth().clickable(onClick = onOpen).padding(vertical = 6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             Text(r.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)

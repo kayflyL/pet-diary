@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鹦鹉日记 · 原型 v3.8 · 视觉升级</title>
+<title>鹦鹉日记 · 原型 v3.9 · 视觉升级</title>
 <style>
 :root{
   --bg:#FAFAF9; --card:#FFFFFF; --surface:#F4F4F3; --ink:#191A1C; --sub:#85878C;
@@ -645,13 +645,14 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
 
 <!-- ════════ 食物库 ════════ -->
 <section class="screen" id="s-food">
-  <div class="h-row"><button class="iconbtn" onclick="nav('s-me')"><svg class="ic"><use href="#i-back"/></svg></button><h1 style="font-size:16px">食物库</h1><span class="chip" onclick="toast('自定义食物：名字+分类即可')">＋ 自定义</span></div>
+  <div class="h-row"><button class="iconbtn" onclick="nav('s-me')"><svg class="ic"><use href="#i-back"/></svg></button><h1 style="font-size:16px">食物库</h1><span class="chip" onclick="foodForm('')">＋ 自定义</span></div>
   <div class="search">🔍 搜索食物（含危险食物警示）…</div>
   <div class="chips"><span class="chip on">全部 36</span><span class="chip">谷物种子</span><span class="chip">滋养丸</span><span class="chip">蔬果</span><span class="chip">零食补给</span><span class="chip">自定义</span></div>
-  <div class="food-row"><span class="fn"><b>黄谷子</b> <span class="badge safe">安全</span><br><span class="b-meta">主食 · 小黄 ❤️</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
-  <div class="food-row"><span class="fn"><b>燕麦米</b> <span class="badge safe">安全</span><br><span class="b-meta">主食 · 小黄 ❤️</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
-  <div class="food-row"><span class="fn"><b>葵花子</b> <span class="badge caut">适量</span><br><span class="b-meta">高脂，建议适量</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
-  <div class="food-row" style="opacity:.85"><span class="fn"><b>牛油果</b> <span class="badge danger">禁吃</span><br><span class="b-meta">对鸟类剧毒——仅作警示教育</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+  <div class="food-row" onclick="toast('内置食物由应用维护 · 偏好在行内直接标')"><span class="fn"><b>黄谷子</b> <span class="badge safe">安全</span><br><span class="b-meta">主食 · 小黄 ❤️</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+  <div class="food-row" onclick="toast('内置食物由应用维护 · 偏好在行内直接标')"><span class="fn"><b>燕麦米</b> <span class="badge safe">安全</span><br><span class="b-meta">主食 · 小黄 ❤️</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+  <div class="food-row" onclick="toast('内置食物由应用维护 · 偏好在行内直接标')"><span class="fn"><b>葵花子</b> <span class="badge caut">适量</span><br><span class="b-meta">高脂，建议适量</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+  <div class="food-row" onclick="toast('内置食物由应用维护 · 偏好在行内直接标')" style="opacity:.85"><span class="fn"><b>牛油果</b> <span class="badge danger">禁吃</span><br><span class="b-meta">对鸟类剧毒——仅作警示教育</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
+  <div class="food-row" onclick="foodForm('自配混合粮')"><span class="fn"><b>自配混合粮</b> <span class="badge safe">安全</span><br><span class="b-meta">自定义 · 谷物种子 · 小黄 ❤️</span></span><svg class="ic" style="color:var(--sub)"><use href="#i-chev"/></svg></div>
 </section>
 
 <!-- ════════ 花费统计 ════════ -->
@@ -758,6 +759,14 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
       <textarea placeholder="备注（可选）：如 滋养丸一袋"></textarea>
       <button class="btn-pri" style="margin-top:14px" onclick="done('已记录开销 ¥98 ✓')">保存</button>
     </div>
+    <div id="sh-food" class="hidden">
+      <h3 id="food-title">自定义食物</h3>
+      <input id="food-name" placeholder="食物名称（如：自配混合粮）" style="width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;font-size:14px;background:var(--card);color:var(--ink);outline:none">
+      <div class="chips" style="margin-top:12px;margin-bottom:0"><span class="chip on">谷物种子</span><span class="chip">滋养丸</span><span class="chip">蔬菜</span><span class="chip">水果</span><span class="chip">零食补给</span><span class="chip">其他</span></div>
+      <div class="chips" style="margin-top:8px;margin-bottom:0"><span class="chip on">安全</span><span class="chip">适量</span><span class="chip">禁吃</span></div>
+      <button class="btn-pri" style="margin-top:14px" onclick="done('已保存到食物库 ✓')">保存</button>
+      <div class="list-row" id="food-del" style="display:none" onclick="foodDel()"><span class="tt" style="color:var(--danger)">删除这个食物<br><span class="b-meta">喂食记录会保留，仅解除关联</span></span></div>
+    </div>
   </div>
 </div>
 <div id="toast"></div>
@@ -778,10 +787,15 @@ function nav(id,btn){document.querySelectorAll('.screen').forEach(s=>s.classList
   document.querySelectorAll('#tabbar button').forEach(b=>b.classList.remove('on'));
   const map={'s-today':0,'s-mem':1,'s-birds':2,'s-me':3};if(map[id]!==undefined)document.querySelectorAll('#tabbar button')[map[id]].classList.add('on');
   document.getElementById('fab').style.display=['s-today','s-mem','s-birds'].includes(id)?'flex':'none';}
-function openSheet(name){document.getElementById('sw').classList.add('show');['home','weight','feed','camera','diary','cost'].forEach(k=>document.getElementById('sh-'+k).classList.toggle('hidden',k!==name));
+function openSheet(name){document.getElementById('sw').classList.add('show');['home','weight','feed','camera','diary','cost','food'].forEach(k=>document.getElementById('sh-'+k).classList.toggle('hidden',k!==name));
   document.getElementById('fab').style.display='none';}
 function closeSheet(){document.getElementById('sw').classList.remove('show');
   document.getElementById('fab').style.display=['s-today','s-mem','s-birds'].includes(cur)?'flex':'none';}
+function foodForm(name){openSheet('food');
+  document.getElementById('food-title').textContent=name?'编辑自定义食物':'自定义食物';
+  document.getElementById('food-name').value=name||'';
+  document.getElementById('food-del').style.display=name?'flex':'none';}
+function foodDel(){closeSheet();toast('已删除 · 喂食记录保留（原型示意）');}
 function step(d){w=Math.round((w+d)*10)/10;document.getElementById('wnum').textContent=w.toFixed(1);}
 function saveWeight(){document.getElementById('hero-w').textContent=w.toFixed(1)+' g';done('已记录 '+w.toFixed(1)+' g ✓');}
 function done(msg){closeSheet();toast(msg);}

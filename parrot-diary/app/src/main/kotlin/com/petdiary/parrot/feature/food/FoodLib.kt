@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,17 +17,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -37,11 +41,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.petdiary.parrot.data.FoodRepository
+import com.petdiary.parrot.data.local.FoodEntity
 import com.petdiary.parrot.data.local.PetFoodPrefEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -58,6 +64,31 @@ data class FoodRowUi(
     val safety: String,
     val isBuiltin: Boolean,
     val prefLevel: String?,   // LOVE/LIKE/NEUTRAL/DISLIKE 或 null 未标记
+)
+
+/** 分类选项（新增/编辑表单用，code 与 FoodEntity.category 对应） */
+private val CATEGORY_OPTIONS = listOf(
+    "GRAIN_SEED" to "谷物种子",
+    "PELLET" to "滋养丸",
+    "VEGGIE" to "蔬菜",
+    "FRUIT" to "水果",
+    "TREAT" to "零食补给",
+    "OTHER" to "其他",
+)
+
+/** 安全等级选项 */
+private val SAFETY_OPTIONS = listOf(
+    "SAFE" to "安全",
+    "CAUTION" to "适量",
+    "DANGER" to "禁吃",
+)
+
+/** 偏好标记选项（行内文字 chips） */
+private val PREF_OPTIONS = listOf(
+    "LOVE" to "最爱",
+    "LIKE" to "爱吃",
+    "NEUTRAL" to "一般",
+    "DISLIKE" to "不吃",
 )
 
 @HiltViewModel
@@ -82,9 +113,20 @@ class FoodLibViewModel @Inject constructor(
         viewModelScope.launch { foodRepository.markPref(petId, foodId, level) }
     }
 
-    fun addCustomFood(name: String) {
+    fun addCustomFood(name: String, category: String, safety: String) {
         if (name.isBlank()) return
-        viewModelScope.launch { foodRepository.addCustomFood(name) }
+        viewModelScope.launch { foodRepository.addCustomFood(name.trim(), category, safety) }
+    }
+
+    fun updateCustomFood(food: FoodEntity, name: String, category: String, safety: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            foodRepository.updateCustomFood(food.copy(name = name.trim(), category = category, safety = safety))
+        }
+    }
+
+    fun deleteFood(id: String) {
+        viewModelScope.launch { foodRepository.deleteCustomFood(id) }
     }
 }
 
@@ -104,6 +146,7 @@ fun FoodLibScreen(petId: String, onBack: () -> Unit, vm: FoodLibViewModel = hilt
     var query by remember { mutableStateOf("") }
     var cat by remember { mutableStateOf("全部") }
     var showAdd by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<FoodRowUi?>(null) }
 
     Scaffold(
         topBar = {
@@ -125,11 +168,14 @@ fun FoodLibScreen(petId: String, onBack: () -> Unit, vm: FoodLibViewModel = hilt
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text("🔍 搜索食物（含危险食物警示）…") },
+                placeholder = { Text("搜索食物（含危险食物警示）…") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                modifier = Modifier.padding(vertical = 8.dp),
+            ) {
                 CAT_LABELS.forEach { (label, code) ->
                     FilterChip(selected = cat == label, onClick = { cat = label }, label = { Text(label) })
                 }
@@ -144,7 +190,7 @@ fun FoodLibScreen(petId: String, onBack: () -> Unit, vm: FoodLibViewModel = hilt
                         "自定义" -> !r.isBuiltin
                         else -> cat.split(",").contains(r.category)
                     }
-                    q.isEmpty() || r.name.contains(q)
+                    catOk && (q.isEmpty() || r.name.contains(q))
                 }
                 .sortedWith(
                     compareByDescending<FoodRowUi> { it.prefLevel == "LOVE" }
@@ -154,7 +200,7 @@ fun FoodLibScreen(petId: String, onBack: () -> Unit, vm: FoodLibViewModel = hilt
 
             LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 items(visible, key = { it.id }) { r ->
-                    FoodRow(r) { level -> vm.mark(r.id, level) }
+                    FoodRow(r, onMark = { level -> vm.mark(r.id, level) }, onOpen = { editing = r })
                 }
                 item {
                     Box(
@@ -176,61 +222,156 @@ fun FoodLibScreen(petId: String, onBack: () -> Unit, vm: FoodLibViewModel = hilt
     }
 
     if (showAdd) {
-        var customName by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { showAdd = false },
-            title = { Text("添加自定义食物") },
-            text = {
-                OutlinedTextField(
-                    value = customName,
-                    onValueChange = { customName = it },
-                    label = { Text("食物名称") },
-                    singleLine = true,
-                )
+        FoodFormSheet(
+            title = "自定义食物",
+            initial = null,
+            readOnly = false,
+            onDismiss = { showAdd = false },
+            onSave = { name, catCode, safety ->
+                vm.addCustomFood(name, catCode, safety)
+                showAdd = false
             },
-            confirmButton = {
-                TextButton(
-                    enabled = customName.isNotBlank(),
-                    onClick = {
-                        vm.addCustomFood(customName)
-                        customName = ""
-                        showAdd = false
-                    },
-                ) { Text("添加") }
+            onDelete = null,
+        )
+    }
+
+    editing?.let { r ->
+        val entity = FoodEntity(
+            id = r.id,
+            name = r.name,
+            category = r.category,
+            safety = r.safety,
+            isBuiltin = r.isBuiltin,
+            createdAt = 0L,
+        )
+        FoodFormSheet(
+            title = if (r.isBuiltin) "食物详情" else "编辑自定义食物",
+            initial = r,
+            readOnly = r.isBuiltin,
+            onDismiss = { editing = null },
+            onSave = { name, catCode, safety ->
+                vm.updateCustomFood(entity, name, catCode, safety)
+                editing = null
             },
-            dismissButton = { TextButton(onClick = { showAdd = false }) { Text("取消") } },
+            onDelete = if (r.isBuiltin) null else {
+                { vm.deleteFood(r.id); editing = null }
+            },
         )
     }
 }
 
+/** 新增/编辑自定义食物的底单：名字 + 分类 + 安全等级；内置食物只读展示 */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FoodRow(r: FoodRowUi, onMark: (String) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text(r.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                SafetyBadge(r.safety)
-                if (!r.isBuiltin) {
-                    Text("自定义", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun FoodFormSheet(
+    title: String,
+    initial: FoodRowUi?,
+    readOnly: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (name: String, category: String, safety: String) -> Unit,
+    onDelete: (() -> Unit)?,
+) {
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var cat by remember { mutableStateOf(initial?.category ?: "OTHER") }
+    var safety by remember { mutableStateOf(initial?.safety ?: "SAFE") }
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            if (readOnly) {
+                Text(
+                    "内置食物由应用维护（含安全警示知识库），仅可标记偏好",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 6.dp),
+                )
+            }
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                enabled = !readOnly,
+                label = { Text("食物名称") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
+            Text("分类", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 14.dp, bottom = 2.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                CATEGORY_OPTIONS.forEach { (code, label) ->
+                    FilterChip(
+                        selected = cat == code,
+                        enabled = !readOnly,
+                        onClick = { cat = code },
+                        label = { Text(label) },
+                    )
                 }
             }
-            prefHint(r.prefLevel)?.let { hint ->
-                Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("安全等级", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp, bottom = 2.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                SAFETY_OPTIONS.forEach { (code, label) ->
+                    FilterChip(
+                        selected = safety == code,
+                        enabled = !readOnly,
+                        onClick = { safety = code },
+                        label = { Text(label) },
+                    )
+                }
+            }
+            Button(
+                onClick = {
+                    onSave(name, cat, safety)
+                },
+                enabled = !readOnly && name.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            ) {
+                Text("保存")
+            }
+            onDelete?.let { del ->
+                TextButton(
+                    onClick = del,
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                ) {
+                    Text("删除这个食物（喂食记录会保留，仅解除关联）", color = Color(0xFFA03030), fontSize = 12.sp)
+                }
             }
         }
-        PrefButtons(r.prefLevel) { level -> onMark(level) }
     }
 }
 
-private fun prefHint(level: String?) = when (level) {
-    "LOVE" -> "❤️ 最爱"
-    "LIKE" -> "👍 爱吃"
-    "NEUTRAL" -> "😐 一般"
-    "DISLIKE" -> "🚫 不吃"
-    else -> null
+@Composable
+private fun FoodRow(r: FoodRowUi, onMark: (String) -> Unit, onOpen: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(vertical = 6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text(r.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            SafetyBadge(r.safety)
+            if (!r.isBuiltin) {
+                Text("自定义", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.padding(top = 7.dp)) {
+            PREF_OPTIONS.forEach { (code, label) ->
+                val on = r.prefLevel == code
+                Text(
+                    label,
+                    fontSize = 11.sp,
+                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (on) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier
+                        .background(
+                            if (on) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                            MaterialTheme.shapes.small,
+                        )
+                        .clickable { onMark(code) }
+                        .padding(horizontal = 11.dp, vertical = 5.dp),
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -246,26 +387,5 @@ private fun SafetyBadge(safety: String) {
             .padding(horizontal = 7.dp, vertical = 2.dp),
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = fg, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun PrefButtons(current: String?, onMark: (String) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        listOf("LOVE" to "❤️", "LIKE" to "👍", "NEUTRAL" to "😐", "DISLIKE" to "🚫").forEach { (code, icon) ->
-            val on = current == code
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .background(
-                        if (on) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                        MaterialTheme.shapes.small,
-                    )
-                    .clickable { onMark(code) },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(icon)
-            }
-        }
     }
 }

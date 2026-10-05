@@ -80,6 +80,7 @@ fun TodayScreen(
     onBirdClick: (String) -> Unit,
     onAppearanceToggle: () -> Unit,
     appearanceDark: Boolean,
+    onOpenBirdFoodLib: (String) -> Unit = {},
     vm: TodayViewModel = hiltViewModel(),
 ) {
     val today = LocalDate.now()
@@ -223,6 +224,10 @@ fun TodayScreen(
             favorites = favoriteFoods,
             allFoods = allFoods,
             onDismiss = { sheet = null },
+            onManageFood = {
+                sheet = null
+                ui.selectedBirdId?.let(onOpenBirdFoodLib)
+            },
             onSave = { foodId, note ->
                 vm.recordFeed(foodId, note)
                 sheet = null
@@ -764,6 +769,7 @@ private fun FeedSheet(
     favorites: List<Pair<String, String>>,
     allFoods: List<com.petdiary.parrot.data.local.FoodEntity>,
     onDismiss: () -> Unit,
+    onManageFood: () -> Unit,
     onSave: (String?, String?) -> Unit,
 ) {
     var selectedFoodId by remember { mutableStateOf<String?>(null) }
@@ -777,13 +783,20 @@ private fun FeedSheet(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 10.dp),
         )
-        Text("❤️ 最爱", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("最爱", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(4.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 10.dp)) {
             favorites.forEach { (id, name) ->
-                FilterChip(selected = selectedFoodId == id, onClick = { selectedFoodId = id }, label = { Text("$name ❤️") })
+                FilterChip(selected = selectedFoodId == id, onClick = { selectedFoodId = id }, label = { Text(name) })
             }
-            if (favorites.isEmpty()) Text("还没有最爱标记，去食物库标一个", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (favorites.isEmpty()) {
+                Text(
+                    "还没有最爱标记 · 去食物库标一个",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable(onClick = onManageFood),
+                )
+            }
         }
         Text("其他常吃", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(4.dp))
@@ -806,6 +819,15 @@ private fun FeedSheet(
         ) {
             Text("✓ 保存", fontWeight = FontWeight.Bold)
         }
-        Spacer(Modifier.height(12.dp))
+        Text(
+            "库里没有？管理食物库 ›",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onManageFood)
+                .padding(top = 10.dp, bottom = 14.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
     }
 }

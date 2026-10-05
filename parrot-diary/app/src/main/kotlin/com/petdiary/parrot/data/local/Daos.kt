@@ -207,6 +207,13 @@ interface FoodDao {
 
     @Query("SELECT * FROM foods WHERE id = :id")
     suspend fun getById(id: String): FoodEntity?
+
+    @Update
+    suspend fun update(food: FoodEntity)
+
+    /** 只删自定义食物（isBuiltin=0 条件兜底）；喂食记录外键 SET_NULL 保留 */
+    @Query("DELETE FROM foods WHERE id = :id AND isBuiltin = 0")
+    suspend fun deleteCustomById(id: String)
 }
 
 @Dao

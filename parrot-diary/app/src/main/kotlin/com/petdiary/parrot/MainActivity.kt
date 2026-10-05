@@ -129,6 +129,7 @@ fun AppNavHost(appearance: String, onCycleAppearance: () -> Unit) {
                     onBirdClick = { petId -> nav.navigate("bird/$petId") },
                     onAppearanceToggle = onCycleAppearance,
                     appearanceDark = appearance == "DARK",
+                    onOpenBirdFoodLib = { petId -> nav.navigate("food/$petId") },
                 )
             }
             composable("memories") {

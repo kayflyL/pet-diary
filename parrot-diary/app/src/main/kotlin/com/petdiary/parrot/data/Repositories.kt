@@ -65,19 +65,31 @@ class FoodRepository @Inject constructor(
         }
     }
 
-    suspend fun addCustomFood(name: String, category: String = "OTHER") {
+    suspend fun addCustomFood(name: String, category: String = "OTHER", safety: String = "SAFE") {
         foodDao.insertAll(
             listOf(
                 FoodEntity(
                     id = UUID.randomUUID().toString(),
                     name = name.trim(),
                     category = category,
-                    safety = "SAFE",
+                    safety = safety,
                     isBuiltin = false,
                     createdAt = System.currentTimeMillis(),
                 ),
             ),
         )
+    }
+
+    /** 编辑自定义食物；内置食物是审校过的安全知识库，拒绝改动 */
+    suspend fun updateCustomFood(food: FoodEntity): Boolean {
+        val old = foodDao.getById(food.id) ?: return false
+        if (old.isBuiltin) return false
+        foodDao.update(food.copy(name = food.name.trim(), isBuiltin = false))
+        return true
+    }
+
+    suspend fun deleteCustomFood(id: String) {
+        foodDao.deleteCustomById(id)
     }
 
     /** 记喂食：foodId 可空（自由记录） */

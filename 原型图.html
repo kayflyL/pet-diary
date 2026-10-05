@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鹦鹉日记 · 原型 v3 · 视觉升级</title>
+<title>鹦鹉日记 · 原型 v3.8 · 视觉升级</title>
 <style>
 :root{
   --bg:#FAFAF9; --card:#FFFFFF; --surface:#F4F4F3; --ink:#191A1C; --sub:#85878C;
@@ -447,7 +447,6 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
     <h1 style="font-size:27px;letter-spacing:-.5px;font-weight:800">
       <span class="mt on" onclick="mseg(this,'m-story')">故事</span>
       <span class="mt" onclick="mseg(this,'m-map')">地图</span>
-      <span class="mt" onclick="mseg(this,'m-photo')">照片</span>
     </h1>
     <span class="sub" style="align-self:flex-end">5 地点 · 103 张</span>
   </div>
@@ -456,13 +455,13 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
     <div style="display:flex;gap:10px">
       <div class="monthrail"><span>6月</span><span>7月</span><span class="on">8月</span><span>9月</span><span>10月</span><span>11月</span></div>
       <div class="mas" style="flex:1">
-        <div class="stile" style="background:linear-gradient(140deg,#CBE5D6,#5FA97E)" onclick="nav('s-place')"><div class="ov"><b>人民公园的夏天</b><small>4 月 5 日 · 12 张照片 · 2 条日记</small></div></div>
-        <div class="stile" style="background:linear-gradient(140deg,#D4E5F7,#8FB3D9);aspect-ratio:1.2"><div class="ov"><b>第一次洗澡</b><small>9 月 28 日 · 3 张照片</small></div></div>
-        <div class="stile" style="background:linear-gradient(140deg,#FFE9BE,#F0C25F)"><div class="ov"><b>家里的日常</b><small>86 张照片 · 持续更新</small></div></div>
-        <div class="stile" style="background:linear-gradient(140deg,#E3D7F5,#B9A5E0)"><div class="ov"><b>学会吹口哨</b><small>1 条日记</small></div></div>
+        <div class="stile" style="background:linear-gradient(140deg,#CBE5D6,#5FA97E)" onclick="event.stopPropagation();pvOpen('park',0)"><div class="ov"><b>人民公园的夏天</b><small>4 月 5 日 · 12 张照片 · 2 条日记</small></div></div>
+        <div class="stile" style="background:linear-gradient(140deg,#D4E5F7,#8FB3D9);aspect-ratio:1.2" onclick="event.stopPropagation();pvOpen('grandma',0)"><div class="ov"><b>第一次洗澡</b><small>9 月 28 日 · 3 张照片</small></div></div>
+        <div class="stile" style="background:linear-gradient(140deg,#FFE9BE,#F0C25F)" onclick="event.stopPropagation();pvOpen('home',0)"><div class="ov"><b>家里的日常</b><small>86 张照片 · 持续更新</small></div></div>
+        <div class="stile" style="background:linear-gradient(140deg,#E3D7F5,#B9A5E0)" onclick="toast('纯日记故事：点开是日记详情（开发中）')"><div class="ov"><b>学会吹口哨</b><small>1 条日记</small></div></div>
       </div>
     </div>
-    <div class="refnote" style="margin-top:8px">故事 = 同一天同一地的照片与日记自动打包 · 左侧竖排月份为时间轨道 · 重复照片自动隐藏</div>
+    <div class="refnote" style="margin-top:8px">故事 = 同一天同一地的照片与日记自动打包 · 左侧竖排月份为时间轨道 · 点瓦片直接全屏看图（v3.8 照片页签并入故事）</div>
   </div>
 
   <div id="m-map" class="hidden">
@@ -517,13 +516,6 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
 
   </div>
 
-  <div id="m-photo" class="hidden">
-    <div class="m-label" style="margin-top:0">10 月 · 3 张</div>
-    <div class="grid-ph"><div class="ph g1">🦜</div><div class="ph g2">🌻</div><div class="ph" style="background:linear-gradient(140deg,#D9EBC4,#A8CE8E)">🌿</div></div>
-    <div class="m-label">9 月 · 4 张</div>
-    <div class="grid-ph"><div class="ph g4">🛁</div><div class="ph g3">☁️</div><div class="ph" style="background:linear-gradient(140deg,#F6D6E0,#EFB3C8)">🎶</div><div class="ph" style="background:linear-gradient(140deg,#E3D7F5,#C7B4EA)">🪶</div></div>
-    <div class="dupnote">✨ 同一场景的连拍会自动隐藏重复，保留最好的那张（StoryTeller 概念）</div>
-  </div>
 </section>
 
 <!-- ════════ 地点详情（行迹特色页） ════════ -->
@@ -747,7 +739,7 @@ textarea{width:100%;height:88px;border:1px solid var(--line);border-radius:14px;
     <div id="sh-camera" class="hidden">
       <h3>拍照 · 视频</h3>
       <div class="ph" style="height:170px;border-radius:18px;background:linear-gradient(140deg,var(--s2),var(--pri))"></div>
-      <div class="refnote" style="margin:10px 2px">将调起相机 · 照片自动记录拍摄地点 → 出现在「回忆 · 地图」与照片墙</div>
+      <div class="refnote" style="margin:10px 2px">将调起相机 · 照片自动记录拍摄地点 → 出现在「回忆 · 故事」与地图</div>
       <textarea placeholder="一句话（可选）"></textarea>
       <button class="btn-pri" style="margin-top:14px" onclick="done('已保存到回忆 ✓')">保存</button>
     </div>
@@ -798,7 +790,7 @@ let lt;function toast(m){const t=document.getElementById('toast');t.innerHTML='<
 function dtab(btn,id){btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
   ['d-ov','d-ph','d-diet'].forEach(k=>document.getElementById(k).classList.toggle('hidden',k!==id));}
 function mseg(el,id){el.parentElement.querySelectorAll('.mt').forEach(s=>s.classList.remove('on'));el.classList.add('on');
-  ['m-story','m-photo','m-map'].forEach(k=>document.getElementById(k).classList.toggle('hidden',k!==id));}
+  ['m-story','m-map'].forEach(k=>document.getElementById(k).classList.toggle('hidden',k!==id));}
 function mark(btn){btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');toast('已更新饮食偏好');}
 function switchBird(el,name,species,meta,wt,days,cnt,ch){document.querySelectorAll('.avstack .a').forEach(a=>a.classList.remove('on'));el.classList.add('on');
   document.getElementById('hero-name').textContent=name;

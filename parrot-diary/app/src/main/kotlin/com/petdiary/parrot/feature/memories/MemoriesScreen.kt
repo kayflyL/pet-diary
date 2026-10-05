@@ -161,12 +161,6 @@ fun MemoriesScreen(
                             if (story.photos.isNotEmpty()) viewer = ViewerState(story.photos, 0)
                             else android.widget.Toast.makeText(context, "纯日记故事：日记详情开发中", android.widget.Toast.LENGTH_SHORT).show()
                         }
-                        Text(
-                            "故事 = 同一天的照片与日记自动打包 · 点瓦片直接全屏看图 · 左侧竖排月份为时间轨道",
-                            fontSize = 10.5.sp,
-                            color = SubInk,
-                            modifier = Modifier.padding(top = 10.dp),
-                        )
                         Spacer(Modifier.height(20.dp))
                     }
                     else -> PhotoMap(

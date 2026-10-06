@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -203,7 +204,11 @@ fun AvatarCropScreen(onDone: () -> Unit, vm: AvatarCropViewModel = hiltViewModel
                         contentScale = ContentScale.FillBounds,
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .size(with(density) { (bmp.width * k).toDp() }, with(density) { (bmp.height * k).toDp() })
+                            // requiredSize：不受父框约束钳制（被钳制会把整图压进框里），溢出由框裁切
+                            .requiredSize(
+                                with(density) { (bmp.width * k).toDp() },
+                                with(density) { (bmp.height * k).toDp() },
+                            )
                             .graphicsLayer {
                                 scaleX = scale
                                 scaleY = scale

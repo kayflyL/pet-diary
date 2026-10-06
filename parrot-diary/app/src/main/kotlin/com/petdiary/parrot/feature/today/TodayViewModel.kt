@@ -147,11 +147,11 @@ class TodayViewModel @Inject constructor(
         viewModelScope.launch { weightRepository.record(pet.id, grams) }
     }
 
-    val allFoods: StateFlow<List<FoodEntity>> = foodRepository.observeAllFoods()
+    private val allFoods: StateFlow<List<FoodEntity>> = foodRepository.observeAllFoods()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** 该鸟标记为 ❤️ 最爱的食物 (foodId, 名称) */
-    val favoriteFoods: StateFlow<List<Pair<String, String>>> = selectedBird
+    /** 该鸟标记为 ❤️ 最爱的食物 (foodId, 名称)（时间线最爱徽章用） */
+    private val favoriteFoods: StateFlow<List<Pair<String, String>>> = selectedBird
         .flatMapLatest { pet ->
             if (pet == null) flowOf(emptyList())
             else foodRepository.observePrefs(pet.id).combine(foodRepository.observeAllFoods()) { prefs, foods ->
@@ -160,11 +160,6 @@ class TodayViewModel @Inject constructor(
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    fun recordFeed(foodId: String?, note: String? = null) {
-        val pet = selectedBird.value ?: return
-        viewModelScope.launch { foodRepository.recordFeed(pet.id, foodId, note = note) }
-    }
 
     // ── 周历状态：选中日 + 周偏移 ──
     private val selectedDay = MutableStateFlow(LocalDate.now())

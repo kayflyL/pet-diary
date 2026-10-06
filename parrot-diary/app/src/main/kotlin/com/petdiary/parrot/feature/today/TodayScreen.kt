@@ -93,8 +93,6 @@ fun TodayScreen(
 ) {
     val today = LocalDate.now()
     val ui by vm.todayUi(today).collectAsState()
-    val favoriteFoods by vm.favoriteFoods.collectAsState()
-    val allFoods by vm.allFoods.collectAsState()
     val heroPhotoPath by vm.heroPhotoPath.collectAsState()
     var sheet by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState()
@@ -217,7 +215,6 @@ fun TodayScreen(
                     modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp),
                 )
                 SheetRow("activity", "记体重", "默认上次 ${ui.latestWeightText ?: "—"}") { sheet = "weight" }
-                SheetRow("leaf", "记喂食", "最爱食物优先") { sheet = "feed" }
                 SheetRow("camera", "拍照", "随手拍进回忆 · 自动记录地点") { sheet = null; shoot() }
                 SheetRow("pen", "写日记", "文字 + 照片 + 心情标签") { sheet = "diary" }
                 SheetRow("wallet", "记开销", "花销随手记") { sheet = "expense" }
@@ -230,20 +227,6 @@ fun TodayScreen(
             onDismiss = { sheet = null },
             onSave = { grams ->
                 vm.recordWeight(grams)
-                sheet = null
-            },
-        )
-        "feed" -> FeedSheet(
-            birdName = ui.name,
-            favorites = favoriteFoods,
-            allFoods = allFoods,
-            onDismiss = { sheet = null },
-            onManageFood = {
-                sheet = null
-                ui.selectedBirdId?.let(onOpenBirdFoodLib)
-            },
-            onSave = { foodId, note ->
-                vm.recordFeed(foodId, note)
                 sheet = null
             },
         )
@@ -811,76 +794,5 @@ private fun SheetRow(ico: String, title: String, sub: String, onClick: () -> Uni
             Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
-@Composable
-private fun FeedSheet(
-    birdName: String,
-    favorites: List<Pair<String, String>>,
-    allFoods: List<com.petdiary.parrot.data.local.FoodEntity>,
-    onDismiss: () -> Unit,
-    onManageFood: () -> Unit,
-    onSave: (String?, String?) -> Unit,
-) {
-    var selectedFoodId by remember { mutableStateOf<String?>(null) }
-    var note by remember { mutableStateOf("") }
-    val sheetState = rememberModalBottomSheetState()
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        SheetContent("$birdName · 记喂食") {
-        Text(
-            "最爱食物优先 · 点选后保存",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 10.dp),
-        )
-        Text("最爱", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(4.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 10.dp)) {
-            favorites.forEach { (id, name) ->
-                FilterChip(selected = selectedFoodId == id, onClick = { selectedFoodId = id }, label = { Text(name) })
-            }
-            if (favorites.isEmpty()) {
-                Text(
-                    "还没有最爱标记 · 去食物库标一个",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable(onClick = onManageFood),
-                )
-            }
-        }
-        Text("其他常吃", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(4.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 10.dp)) {
-            // 禁吃食物不进入快捷选择（§6.3）
-            allFoods.filter { f -> favorites.none { it.first == f.id } && f.safety != "DANGER" }.take(8).forEach { f ->
-                FilterChip(selected = selectedFoodId == f.id, onClick = { selectedFoodId = f.id }, label = { Text(f.name) })
-            }
-        }
-        OutlinedTextField(
-            value = note,
-            onValueChange = { note = it },
-            label = { Text("备注（可选）") },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Button(
-            onClick = { onSave(selectedFoodId, note.ifBlank { null }) },
-            enabled = selectedFoodId != null || note.isNotBlank(),
-            modifier = Modifier.fillMaxWidth().height(52.dp).padding(top = 12.dp),
-        ) {
-            Text("✓ 保存", fontWeight = FontWeight.Bold)
-        }
-        Text(
-            "库里没有？管理食物库 ›",
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onManageFood)
-                .padding(top = 10.dp, bottom = 14.dp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
-        }
     }
 }

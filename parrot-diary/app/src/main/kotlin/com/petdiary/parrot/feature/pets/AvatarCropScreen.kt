@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
@@ -36,6 +37,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -159,7 +161,9 @@ fun AvatarCropScreen(onDone: () -> Unit, vm: AvatarCropViewModel = hiltViewModel
                 modifier = Modifier.weight(1f),
             )
         }
-        // 裁剪框：所见即所得，框内即保存范围
+        // 裁剪框：所见即所得，框内即保存范围。
+        // 图片按 Crop 实际尺寸铺出（比框大、居中），由框裁掉溢出——
+        // 若用 fillMaxSize+Crop，框外像素会被提前裁掉，拖动时就露出黑底而不是照片其它部分。
         Box(
             Modifier
                 .fillMaxWidth()
@@ -170,11 +174,14 @@ fun AvatarCropScreen(onDone: () -> Unit, vm: AvatarCropViewModel = hiltViewModel
                 .pointerInput(image) {
                     detectTransformGestures { _, pan, zoom, _ ->
                         val bmp = image ?: return@detectTransformGestures
-                        // 可拖余量 = Crop 填充溢出 + 缩放溢出（Crop 溢出漏算会导致 scale=1 时拖不动）
-                        val k = maxOf(size.width.toFloat() / bmp.width, size.height.toFloat() / bmp.height)
+                        if (frameSize.width == 0 || frameSize.height == 0) return@detectTransformGestures
+                        val k = maxOf(
+                            frameSize.width.toFloat() / bmp.width,
+                            frameSize.height.toFloat() / bmp.height,
+                        )
                         val newScale = (scale * zoom).coerceIn(1f, 6f)
-                        val maxX = (bmp.width * k * newScale - size.width) / 2f
-                        val maxY = (bmp.height * k * newScale - size.height) / 2f
+                        val maxX = (bmp.width * k * newScale - frameSize.width) / 2f
+                        val maxY = (bmp.height * k * newScale - frameSize.height) / 2f
                         scale = newScale
                         offset = Offset(
                             (offset.x + pan.x).coerceIn(-maxX, maxX),
@@ -183,20 +190,28 @@ fun AvatarCropScreen(onDone: () -> Unit, vm: AvatarCropViewModel = hiltViewModel
                     }
                 },
         ) {
+            val density = LocalDensity.current
             image?.let { bmp ->
-                Image(
-                    bitmap = bmp.asImageBitmap(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            translationX = offset.x
-                            translationY = offset.y
-                        },
-                )
+                if (frameSize.width > 0 && frameSize.height > 0) {
+                    val k = maxOf(
+                        frameSize.width.toFloat() / bmp.width,
+                        frameSize.height.toFloat() / bmp.height,
+                    )
+                    Image(
+                        bitmap = bmp.asImageBitmap(),
+                        contentDescription = null,
+                        contentScale = ContentScale.FillBounds,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(with(density) { (bmp.width * k).toDp() }, with(density) { (bmp.height * k).toDp() })
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                translationX = offset.x
+                                translationY = offset.y
+                            },
+                    )
+                }
             } ?: Box(
                 Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,

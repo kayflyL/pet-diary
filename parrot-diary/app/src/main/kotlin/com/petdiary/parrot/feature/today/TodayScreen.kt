@@ -69,6 +69,7 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import coil3.compose.AsyncImage
 import com.petdiary.parrot.feature.common.FlipText
+import com.petdiary.parrot.feature.common.LucideIcon
 import com.petdiary.parrot.feature.common.fluidEnter
 import com.petdiary.parrot.feature.common.tiltPress
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -204,15 +205,21 @@ fun TodayScreen(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 18.dp),
             ) {
-            Text("记一笔 · ${ui.name}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp))
-            SheetRow("⚖", "记体重", "默认上次 ${ui.latestWeightText ?: "—"}") { sheet = "weight" }
-            SheetRow("🌾", "记喂食", "最爱食物优先") { sheet = "feed" }
-            SheetRow("📷", "拍照", "随手拍进回忆 · 自动记录地点") { sheet = null; shoot() }
-            SheetRow("✏️", "写日记", "文字 + 照片 + 心情标签") { sheet = "diary" }
-            SheetRow("💰", "记开销", "花销随手记") { sheet = "expense" }
-            Spacer(Modifier.height(14.dp))
+                Text(
+                    "记一笔 · ${ui.name}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp),
+                )
+                SheetRow("activity", "记体重", "默认上次 ${ui.latestWeightText ?: "—"}") { sheet = "weight" }
+                SheetRow("leaf", "记喂食", "最爱食物优先") { sheet = "feed" }
+                SheetRow("camera", "拍照", "随手拍进回忆 · 自动记录地点") { sheet = null; shoot() }
+                SheetRow("pen", "写日记", "文字 + 照片 + 心情标签") { sheet = "diary" }
+                SheetRow("wallet", "记开销", "花销随手记") { sheet = "expense" }
+                Spacer(Modifier.height(16.dp))
             }
         }
         "weight" -> WeightSheet(
@@ -768,11 +775,18 @@ private fun WeightSheet(birdName: String, initialGrams: Double?, onDismiss: () -
 @Composable
 private fun SheetRow(ico: String, title: String, sub: String, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 11.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
-        Text(ico, fontSize = 20.sp)
+        Box(
+            Modifier
+                .size(40.dp)
+                .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            LucideIcon(ico, MaterialTheme.colorScheme.onPrimaryContainer, Modifier.size(20.dp))
+        }
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
             Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

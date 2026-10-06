@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -80,7 +82,7 @@ import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun TodayScreen(
     onBirdClick: (String) -> Unit,
@@ -654,7 +656,7 @@ private fun RecordRow(r: com.petdiary.parrot.feature.today.DayRecordUi, modifier
 }
 
 /** 记开销表单（原型 FAB 五项之一） */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun ExpenseSheet(
     categories: List<Pair<String, String>>,
@@ -666,10 +668,10 @@ private fun ExpenseSheet(
     val amount = amountText.toDoubleOrNull()
     val sheetState = rememberModalBottomSheetState()
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Text("记一笔 · 开销", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp))
+        SheetContent("记一笔 · 开销") {
         Text("分类", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(bottom = 12.dp)) {
             categories.forEach { (code, label) ->
                 FilterChip(selected = cat == code, onClick = { cat = code }, label = { Text(label) })
             }
@@ -690,10 +692,11 @@ private fun ExpenseSheet(
             Text("✓ 保存", fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(12.dp))
+        }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun DiarySheet(
     birdName: String,
@@ -708,7 +711,7 @@ private fun DiarySheet(
     }
     val sheetState = rememberModalBottomSheetState()
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Text("$birdName · 写日记", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp))
+        SheetContent("$birdName · 写日记") {
         OutlinedTextField(
             value = text,
             onValueChange = { text = it },
@@ -726,7 +729,7 @@ private fun DiarySheet(
             FilterChip(selected = uris.isNotEmpty(), onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, label = { Text("选择照片 ${if (uris.isNotEmpty()) "(${uris.size})" else ""}") })
         }
         Text("心情标签", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             listOf("换羽", "洗澡", "放风", "精神好", "精神一般", "萎靡").forEach { tag ->
                 FilterChip(selected = tag in tags, onClick = { tags = if (tag in tags) tags - tag else tags + tag }, label = { Text(tag) })
             }
@@ -739,16 +742,17 @@ private fun DiarySheet(
             Text("✓ 保存", fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(12.dp))
+        }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun WeightSheet(birdName: String, initialGrams: Double?, onDismiss: () -> Unit, onSave: (Double) -> Unit) {
     var grams by remember { mutableStateOf(initialGrams ?: 0.0) }
     val sheetState = rememberModalBottomSheetState()
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Text("$birdName · 记体重", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp))
+        SheetContent("$birdName · 记体重") {
         Text(
             "%.1f".format(grams) + " g",
             fontSize = 52.sp,
@@ -769,6 +773,21 @@ private fun WeightSheet(birdName: String, initialGrams: Double?, onDismiss: () -
             Text("✓ 保存", fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+
+/** 底单内容统一容器：18dp 水平边距 + 标题规范（所有记一笔子表单共用） */
+@Composable
+private fun SheetContent(title: String, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp),
+        )
+        content()
     }
 }
 
@@ -795,7 +814,7 @@ private fun SheetRow(ico: String, title: String, sub: String, onClick: () -> Uni
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun FeedSheet(
     birdName: String,
@@ -809,7 +828,7 @@ private fun FeedSheet(
     var note by remember { mutableStateOf("") }
     val sheetState = rememberModalBottomSheetState()
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Text("$birdName · 记喂食", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp))
+        SheetContent("$birdName · 记喂食") {
         Text(
             "最爱食物优先 · 点选后保存",
             style = MaterialTheme.typography.bodySmall,
@@ -818,7 +837,7 @@ private fun FeedSheet(
         )
         Text("最爱", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(4.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 10.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 10.dp)) {
             favorites.forEach { (id, name) ->
                 FilterChip(selected = selectedFoodId == id, onClick = { selectedFoodId = id }, label = { Text(name) })
             }
@@ -833,9 +852,9 @@ private fun FeedSheet(
         }
         Text("其他常吃", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(4.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 10.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 10.dp)) {
             // 禁吃食物不进入快捷选择（§6.3）
-            allFoods.filter { f -> favorites.none { it.first == f.id } && f.safety != "DANGER" }.take(5).forEach { f ->
+            allFoods.filter { f -> favorites.none { it.first == f.id } && f.safety != "DANGER" }.take(8).forEach { f ->
                 FilterChip(selected = selectedFoodId == f.id, onClick = { selectedFoodId = f.id }, label = { Text(f.name) })
             }
         }
@@ -862,5 +881,6 @@ private fun FeedSheet(
                 .padding(top = 10.dp, bottom = 14.dp),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
+        }
     }
 }

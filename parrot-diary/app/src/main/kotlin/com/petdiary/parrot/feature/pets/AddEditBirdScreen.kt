@@ -87,11 +87,14 @@ fun AddEditBirdScreen(onDone: () -> Unit, vm: AddEditBirdViewModel = hiltViewMod
                 singleLine = true,
             )
             Spacer(Modifier.height(12.dp))
-            DropdownField(
+            ChipSelector(
                 label = "品种 *",
-                display = SpeciesCatalog.nameOf(form.speciesId).ifBlank { "" },
                 options = SpeciesCatalog.all.map { it.name },
-                onSelect = { name -> vm.update { it.copy(speciesId = SpeciesCatalog.all.first { o -> o.name == name }.id) } },
+                selected = SpeciesCatalog.nameOf(form.speciesId).ifBlank { null },
+                onSelect = { name ->
+                    val sid = name?.let { n -> SpeciesCatalog.all.first { o -> o.name == n }.id }.orEmpty()
+                    vm.update { f -> f.copy(speciesId = sid) }
+                },
             )
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
@@ -110,11 +113,11 @@ fun AddEditBirdScreen(onDone: () -> Unit, vm: AddEditBirdViewModel = hiltViewMod
                 singleLine = true,
             )
             Spacer(Modifier.height(12.dp))
-            DropdownField(
+            ChipSelector(
                 label = "来源（可选）",
-                display = form.source,
                 options = BirdSources.presets,
-                onSelect = { v -> vm.update { it.copy(source = v) } },
+                selected = form.source,
+                onSelect = { v -> vm.update { it.copy(source = v.orEmpty()) } },
             )
 
             FormSection("时间")
@@ -138,10 +141,10 @@ fun AddEditBirdScreen(onDone: () -> Unit, vm: AddEditBirdViewModel = hiltViewMod
                 }
             }
             Spacer(Modifier.height(12.dp))
-            DropdownField(
+            ChipSelector(
                 label = "性别判定方式（可选）",
-                display = form.genderMethod.orEmpty(),
                 options = GenderMethods.presets,
+                selected = form.genderMethod.orEmpty(),
                 onSelect = { v -> vm.update { it.copy(genderMethod = v) } },
             )
 
@@ -217,35 +220,21 @@ private fun FormSection(title: String) {
     )
 }
 
-/** 只读下拉（避免实验性 API），点击弹菜单 */
+/** 单选 chips（替代原生下拉，与全 App 的 chips 语言统一）；再点已选中项取消选择 */
 @Composable
-private fun DropdownField(label: String, display: String, options: List<String>, onSelect: (String) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        OutlinedTextField(
-            value = display,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(label) },
-            modifier = Modifier.fillMaxWidth().clickable { expanded = true },
-            trailingIcon = {
-                IconButton(onClick = { expanded = !expanded }) {
-                    Icon(Icons.Outlined.ArrowDropDown, contentDescription = null)
-                }
-            },
-        )
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option) },
-                    onClick = {
-                        expanded = false
-                        onSelect(option)
-                    },
-                )
-            }
+private fun ChipSelector(label: String, options: List<String>, selected: String?, onSelect: (String?) -> Unit) {
+    Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.height(6.dp))
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { option ->
+            FilterChip(
+                selected = selected == option,
+                onClick = { onSelect(if (selected == option) null else option) },
+                label = { Text(option) },
+            )
         }
     }
+    Spacer(Modifier.height(12.dp))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

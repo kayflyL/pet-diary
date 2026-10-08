@@ -73,6 +73,13 @@ class DiaryRepository @Inject constructor(
         return entryId
     }
 
+    /** 编辑日记：更新文字与心情标签（照片集暂不在此改） */
+    suspend fun updateEntryTextTags(entryId: String, text: String, tags: List<String>) {
+        val entry = dao.getEntryById(entryId) ?: return
+        val tagsJson = if (tags.isEmpty()) null else tags.joinToString(separator = "\",\"", prefix = "[\"", postfix = "\"]")
+        dao.updateEntry(entry.copy(text = text.trim(), tags = tagsJson, updatedAt = now()))
+    }
+
     /** 相机直拍：cache 里的文件移入 media 目录并建日记 */
     suspend fun saveCameraPhoto(petId: String, cameraUri: Uri, text: String = "", at: Long = System.currentTimeMillis()): String {
         val entryId = UUID.randomUUID().toString()

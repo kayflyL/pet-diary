@@ -13,6 +13,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 
 data class StoryUi(
@@ -22,8 +23,10 @@ data class StoryUi(
     val photoCount: Int,
     val texts: List<String>,
     val firstPhotoPath: String?,
-    /** 当天全部照片（点瓦片进全屏查看器连看） */
+    /** 当天全部照片（点瓦片进故事详情） */
     val photos: List<PhotoUi> = emptyList(),
+    /** 首图宽高比（高/宽），瀑布流按真实照片比例排布 */
+    val aspect: Float? = null,
 )
 
 data class PhotoUi(
@@ -74,6 +77,11 @@ class MemoriesViewModel @Inject constructor(
                     photoCount = dayMedia.size,
                     texts = list.map { it.text },
                     firstPhotoPath = dayMedia.firstOrNull()?.path,
+                    aspect = dayMedia.firstOrNull()?.path?.let { p ->
+                        val b = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        android.graphics.BitmapFactory.decodeFile(p, b)
+                        if (b.outWidth > 0 && b.outHeight > 0) b.outHeight.toFloat() / b.outWidth else null
+                    },
                     photos = dayMedia.sortedByDescending { it.createdAt }.map { m ->
                         val entry = list.firstOrNull { it.id == m.entryId }
                         PhotoUi(
@@ -107,5 +115,6 @@ class MemoriesViewModel @Inject constructor(
             }
 
         MemoriesUi(stories = stories, photos = photos, geotagged = photos.filter { it.lat != null && it.lng != null })
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MemoriesUi(emptyList(), emptyList(), emptyList()))
+        }.flowOn(kotlinx.coroutines.Dispatchers.IO)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MemoriesUi(emptyList(), emptyList(), emptyList()))
 }

@@ -104,6 +104,7 @@ private val TabIdle = Color(0xFFC7C9CC)
 fun MemoriesScreen(
     onOpenPlace: (String) -> Unit = {},
     onOpenPlaces: () -> Unit = {},
+    onOpenStory: (Long) -> Unit = {},
     vm: MemoriesViewModel = hiltViewModel(),
 ) {
     val ui by vm.ui.collectAsState()
@@ -161,8 +162,7 @@ fun MemoriesScreen(
                             .padding(horizontal = 18.dp),
                     ) {
                         StoryWall(ui.stories, scrollState) { story ->
-                            if (story.photos.isNotEmpty()) viewer = ViewerState(story.photos, 0)
-                            else android.widget.Toast.makeText(context, "纯日记故事：日记详情开发中", android.widget.Toast.LENGTH_SHORT).show()
+                            onOpenStory(story.date.toEpochDay())
                         }
                         Spacer(Modifier.height(20.dp))
                     }
@@ -245,7 +245,8 @@ private fun StoryWall(stories: List<StoryUi>, scrollState: ScrollState, onOpenSt
             columns.forEach { col ->
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     col.forEach { story ->
-                        val ratio = ratios[(stories.indexOf(story)) % ratios.size]
+                        val ratio = story.aspect?.coerceIn(0.72f, 1.4f)
+                            ?: ratios[(stories.indexOf(story)) % ratios.size]
                         StoryTile(
                             story = story,
                             ratio = ratio,

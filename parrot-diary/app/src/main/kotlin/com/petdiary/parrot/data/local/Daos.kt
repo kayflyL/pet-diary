@@ -80,6 +80,12 @@ interface DiaryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEntry(entry: DiaryEntryEntity)
 
+    @Update
+    suspend fun updateEntry(entry: DiaryEntryEntity)
+
+    @Query("SELECT * FROM diary_entries WHERE id = :id")
+    suspend fun getEntryById(id: String): DiaryEntryEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMedia(media: List<DiaryMediaEntity>)
 

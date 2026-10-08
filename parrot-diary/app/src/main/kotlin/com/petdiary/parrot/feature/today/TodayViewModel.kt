@@ -3,6 +3,7 @@ package com.petdiary.parrot.feature.today
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.petdiary.parrot.core.designsystem.BirdAccents
+import com.petdiary.parrot.core.designsystem.petAccentColor
 import com.petdiary.parrot.core.model.SpeciesCatalog
 import com.petdiary.parrot.core.util.AgeFormatter
 import com.petdiary.parrot.data.DiaryRepository
@@ -227,10 +228,10 @@ class TodayViewModel @Inject constructor(
         TodayUi(
             hasBird = pet != null,
             name = pet?.name.orEmpty(),
-            speciesName = pet?.let { SpeciesCatalog.nameOf(it.speciesId) }.orEmpty(),
+            speciesName = pet?.speciesName.orEmpty(),
             ageText = pet?.let { AgeFormatter.formatAge(it.birthDateEpochDay, today.toEpochDay()) },
             companionText = pet?.let { AgeFormatter.formatCompanion(it.gotchaDateEpochDay, it.birthDateEpochDay, today.toEpochDay()) },
-            accent = BirdAccents[(pet?.accentIndex ?: 0).coerceIn(BirdAccents.indices)],
+            accent = pet?.let(::petAccentColor) ?: BirdAccents[0],
             initial = pet?.name?.take(1).orEmpty(),
             latestGrams = weights.value.maxByOrNull { it.weighedAt }?.grams,
             latestWeightText = weights.value.maxByOrNull { it.weighedAt }?.let { "${it.grams} g" },

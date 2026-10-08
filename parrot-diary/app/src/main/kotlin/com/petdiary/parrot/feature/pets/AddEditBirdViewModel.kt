@@ -4,12 +4,16 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.petdiary.parrot.data.PetRepository
+import com.petdiary.parrot.data.local.PersonalityPresetEntity
+import com.petdiary.parrot.data.local.SpeciesEntity
 import com.petdiary.parrot.data.local.PetEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -18,11 +22,14 @@ data class BirdFormState(
     val isEdit: Boolean = false,
     val name: String = "",
     val speciesId: String = "",
+    val speciesName: String = "",
     val morph: String = "",
     val legBand: String = "",
     val source: String = "",
     val gender: String = "U",
-    val genderMethod: String? = null,
+    val refWeightMinG: Double? = null,
+    val refWeightMaxG: Double? = null,
+    val accentColor: Int? = null,
     val birthEpochDay: Long? = null,
     val gotchaEpochDay: Long? = null,
     val tags: Set<String> = emptySet(),
@@ -54,6 +61,31 @@ class AddEditBirdViewModel @Inject constructor(
 
     fun update(transform: (BirdFormState) -> BirdFormState) = _form.update(transform)
 
+    /** 品种库（预置 + 自定义，落库可增删） */
+    val species: StateFlow<List<SpeciesEntity>> = petRepository.observeSpecies()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 个性标签预设池（落库可增删） */
+    val presets: StateFlow<List<PersonalityPresetEntity>> = petRepository.observePresets()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun addSpecies(name: String, weightMinG: Double?, weightMaxG: Double?, onAdded: (String) -> Unit) {
+        viewModelScope.launch { onAdded(petRepository.addCustomSpecies(name, weightMinG, weightMaxG)) }
+    }
+
+    /** onResult=false 表示有鸟正在使用该品种 */
+    fun deleteSpecies(id: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch { onResult(petRepository.deleteSpecies(id)) }
+    }
+
+    fun addPreset(tag: String) {
+        viewModelScope.launch { petRepository.addPreset(tag) }
+    }
+
+    fun deletePreset(tag: String) {
+        viewModelScope.launch { petRepository.deletePreset(tag) }
+    }
+
     fun save(onDone: () -> Unit) {
         val f = _form.value
         if (!f.canSave) return
@@ -66,11 +98,14 @@ class AddEditBirdViewModel @Inject constructor(
                     old.copy(
                         name = f.name.trim(),
                         speciesId = f.speciesId,
+                        speciesName = f.speciesName,
+                        refWeightMinG = f.refWeightMinG,
+                        refWeightMaxG = f.refWeightMaxG,
+                        accentColor = f.accentColor,
                         morph = f.morph.ifBlank { null },
                         legBand = f.legBand.ifBlank { null },
                         source = f.source.ifBlank { null },
                         gender = f.gender,
-                        genderMethod = f.genderMethod,
                         birthDateEpochDay = f.birthEpochDay,
                         gotchaDateEpochDay = f.gotchaEpochDay,
                         personalityTagsJson = tagsJson,
@@ -85,11 +120,14 @@ class AddEditBirdViewModel @Inject constructor(
                         id = java.util.UUID.randomUUID().toString(),
                         name = f.name.trim(),
                         speciesId = f.speciesId,
+                        speciesName = f.speciesName,
+                        refWeightMinG = f.refWeightMinG,
+                        refWeightMaxG = f.refWeightMaxG,
+                        accentColor = f.accentColor,
                         morph = f.morph.ifBlank { null },
                         legBand = f.legBand.ifBlank { null },
                         source = f.source.ifBlank { null },
                         gender = f.gender,
-                        genderMethod = f.genderMethod,
                         birthDateEpochDay = f.birthEpochDay,
                         gotchaDateEpochDay = f.gotchaEpochDay,
                         personalityTagsJson = tagsJson,
@@ -109,11 +147,14 @@ private fun PetEntity.toFormState() = BirdFormState(
     isEdit = true,
     name = name,
     speciesId = speciesId,
+    speciesName = speciesName.orEmpty(),
+    refWeightMinG = refWeightMinG,
+    refWeightMaxG = refWeightMaxG,
+    accentColor = accentColor,
     morph = morph.orEmpty(),
     legBand = legBand.orEmpty(),
     source = source.orEmpty(),
     gender = gender,
-    genderMethod = genderMethod,
     birthEpochDay = birthDateEpochDay,
     gotchaEpochDay = gotchaDateEpochDay,
     tags = personalityTagsJson

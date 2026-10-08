@@ -9,6 +9,10 @@ import com.petdiary.parrot.data.local.FoodEntity
 import com.petdiary.parrot.data.local.FeedLogEntity
 import com.petdiary.parrot.data.local.PetDao
 import com.petdiary.parrot.data.local.PetEntity
+import com.petdiary.parrot.data.local.PersonalityPresetDao
+import com.petdiary.parrot.data.local.PersonalityPresetEntity
+import com.petdiary.parrot.data.local.SpeciesDao
+import com.petdiary.parrot.data.local.SpeciesEntity
 import com.petdiary.parrot.data.local.PetFoodPrefDao
 import com.petdiary.parrot.data.local.PetFoodPrefEntity
 import com.petdiary.parrot.data.local.WeightLogDao
@@ -123,7 +127,11 @@ class FoodRepository @Inject constructor(
 }
 
 @Singleton
-class PetRepository @Inject constructor(private val petDao: PetDao) {
+class PetRepository @Inject constructor(
+    private val petDao: PetDao,
+    private val speciesDao: SpeciesDao,
+    private val presetDao: PersonalityPresetDao,
+) {
     suspend fun setAvatar(petId: String, path: String, focalX: Float? = null, focalY: Float? = null) {
         petDao.getById(petId)?.let {
             petDao.upsert(it.copy(avatarPath = path, avatarFocalX = focalX, avatarFocalY = focalY))
@@ -133,6 +141,30 @@ class PetRepository @Inject constructor(private val petDao: PetDao) {
     suspend fun setHeroPath(petId: String, path: String) {
         petDao.getById(petId)?.let { petDao.upsert(it.copy(heroPath = path)) }
     }
+
+    // ── 品种库（可自定义增删；预置见 MIGRATION_4_5 种子） ──
+    fun observeSpecies(): Flow<List<SpeciesEntity>> = speciesDao.observeAll()
+
+    /** 新增自定义品种；重名复用已有条目 */
+    suspend fun addCustomSpecies(name: String, weightMinG: Double?, weightMaxG: Double?): String {
+        val trimmed = name.trim()
+        speciesDao.observeAll().first().firstOrNull { it.name == trimmed }?.let { return it.id }
+        val id = "custom_" + UUID.randomUUID().toString()
+        speciesDao.insert(SpeciesEntity(id = id, name = trimmed, weightMinG = weightMinG, weightMaxG = weightMaxG))
+        return id
+    }
+
+    /** 删除品种；有鸟正在使用时拒绝（返回 false） */
+    suspend fun deleteSpecies(id: String): Boolean {
+        if (petDao.countBySpecies(id) > 0) return false
+        speciesDao.deleteById(id)
+        return true
+    }
+
+    // ── 个性标签预设池 ──
+    fun observePresets(): Flow<List<PersonalityPresetEntity>> = presetDao.observeAll()
+    suspend fun addPreset(tag: String) = presetDao.insert(PersonalityPresetEntity(tag.trim()))
+    suspend fun deletePreset(tag: String) = presetDao.delete(tag)
     fun observeActive(): Flow<List<PetEntity>> = petDao.observeActive()
     fun observeById(id: String): Flow<PetEntity?> = petDao.observeById(id)
     suspend fun getById(id: String): PetEntity? = petDao.getById(id)

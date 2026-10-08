@@ -52,6 +52,11 @@ val SurfaceDark = Color(0xFF111316)
 val OnSurfaceDark = Color(0xFFE7E9EA)
 val SurfaceVariantDark = Color(0xFF22262A)
 val OnSurfaceVariantDark = Color(0xFF9BA0A6)
+/** 鸟的强调色：自定义 ARGB 优先，否则按 accentIndex 查色板 */
+fun petAccentColor(pet: com.petdiary.parrot.data.local.PetEntity): androidx.compose.ui.graphics.Color =
+    pet.accentColor?.let { androidx.compose.ui.graphics.Color(it) }
+        ?: BirdAccents[pet.accentIndex.coerceIn(BirdAccents.indices)]
+
 val OutlineDark = Color(0xFF3A3E43)
 val OutlineVariantDark = Color(0xFF26292D)
 
@@ -63,4 +68,14 @@ val BirdAccents = listOf(
     Color(0xFF6C8FB5), // 灰鹦蓝
     Color(0xFF9B7FC4), // 紫罗兰
     Color(0xFFE58BA9), // 樱花粉
+)
+
+/** 强调色全色板（编辑档案可自选，存 ARGB 到 pets.accentColor） */
+val AccentPalette = BirdAccents + listOf(
+    Color(0xFF3FA08C), // 青鸭绿
+    Color(0xFF5A6FC4), // 靛蓝
+    Color(0xFFC48A5A), // 焦糖
+    Color(0xFF7C9A3F), // 苔藓
+    Color(0xFFC48A9E), // 玫瑰金
+    Color(0xFF6B7076), // 石墨
 )

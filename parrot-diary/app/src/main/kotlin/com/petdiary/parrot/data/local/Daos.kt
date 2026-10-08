@@ -30,6 +30,9 @@ interface PetDao {
 
     @Query("UPDATE pets SET isArchived = :archived, updatedAt = :now WHERE id = :id")
     suspend fun setArchived(id: String, archived: Boolean, now: Long)
+
+    @Query("SELECT COUNT(*) FROM pets WHERE speciesId = :id")
+    suspend fun countBySpecies(id: String): Int
 }
 
 @Dao
@@ -214,6 +217,36 @@ interface FoodDao {
     /** 只删自定义食物（isBuiltin=0 条件兜底）；喂食记录外键 SET_NULL 保留 */
     @Query("DELETE FROM foods WHERE id = :id AND isBuiltin = 0")
     suspend fun deleteCustomById(id: String)
+}
+
+@Dao
+interface SpeciesDao {
+    @Query("SELECT * FROM species ORDER BY isBuiltin DESC, name")
+    fun observeAll(): Flow<List<SpeciesEntity>>
+
+    @Query("SELECT * FROM species WHERE id = :id")
+    suspend fun getById(id: String): SpeciesEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(species: SpeciesEntity)
+
+    @Query("DELETE FROM species WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("SELECT COUNT(*) FROM species")
+    suspend fun count(): Int
+}
+
+@Dao
+interface PersonalityPresetDao {
+    @Query("SELECT * FROM personality_presets ORDER BY tag")
+    fun observeAll(): Flow<List<PersonalityPresetEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(preset: PersonalityPresetEntity)
+
+    @Query("DELETE FROM personality_presets WHERE tag = :tag")
+    suspend fun delete(tag: String)
 }
 
 @Dao

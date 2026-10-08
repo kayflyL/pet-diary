@@ -65,7 +65,6 @@ data class BirdDetailUi(
     val name: String,
     val speciesName: String,
     val genderText: String,
-    val genderMethodText: String?,
     val ageText: String?,
     val companionText: String?,
     val accent: androidx.compose.ui.graphics.Color,
@@ -84,12 +83,11 @@ fun detailUi(pet: PetEntity?, latest: WeightLogEntity?, count: Int, todayEpochDa
     pet ?: return null
     return BirdDetailUi(
         name = pet.name,
-        speciesName = SpeciesCatalog.nameOf(pet.speciesId),
+        speciesName = pet.speciesName.orEmpty(),
         genderText = AgeFormatter.genderLabel(pet.gender),
-        genderMethodText = pet.genderMethod,
         ageText = AgeFormatter.formatAge(pet.birthDateEpochDay, todayEpochDay),
         companionText = AgeFormatter.formatCompanion(pet.gotchaDateEpochDay, pet.birthDateEpochDay, todayEpochDay),
-        accent = BirdAccents[pet.accentIndex.coerceIn(BirdAccents.indices)],
+        accent = com.petdiary.parrot.core.designsystem.petAccentColor(pet),
         initial = pet.name.take(1),
         tags = pet.personalityTagsJson
             ?.trim('[', ']')

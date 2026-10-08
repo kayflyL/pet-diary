@@ -143,7 +143,6 @@ fun BirdDetailScreen(
             InfoCard("基本信息") {
                 InfoLine("品种", ui.speciesName)
                 InfoLine("性别", ui.genderText)
-                ui.genderMethodText?.let { InfoLine("性别判定", it) }
                 ui.birthText?.let { InfoLine("出壳日 / 生日", it) }
                 ui.gotchaText?.let { InfoLine("到家日", it) }
                 ui.legBand?.let { InfoLine("脚环号", it) }
@@ -163,7 +162,9 @@ fun BirdDetailScreen(
                     Spacer(Modifier.height(6.dp))
                     WeightCurveCard(
                         weights = weights,
-                        refRangeG = pet?.let { com.petdiary.parrot.core.model.SpeciesCatalog.refRangeOf(it.speciesId) },
+                        refRangeG = pet?.let { pp ->
+                            pp.refWeightMinG?.let { lo -> pp.refWeightMaxG?.let { hi -> lo.toInt() to hi.toInt() } }
+                        },
                     )
                 }
             }

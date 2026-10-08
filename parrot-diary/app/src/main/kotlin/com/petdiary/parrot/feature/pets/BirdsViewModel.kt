@@ -49,10 +49,10 @@ data class BirdRowUi(
 fun PetEntity.toRowUi(todayEpochDay: Long): BirdRowUi = BirdRowUi(
     id = id,
     name = name,
-    speciesName = com.petdiary.parrot.core.model.SpeciesCatalog.nameOf(speciesId),
+    speciesName = speciesName.orEmpty(),
     ageText = AgeFormatter.formatAge(birthDateEpochDay, todayEpochDay),
     genderText = AgeFormatter.genderLabel(gender),
-    accent = BirdAccents[accentIndex.coerceIn(BirdAccents.indices)],
+    accent = com.petdiary.parrot.core.designsystem.petAccentColor(this),
 )
 
 fun todayEpochDay(): Long = LocalDate.now().toEpochDay()

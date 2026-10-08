@@ -3,6 +3,8 @@ package com.petdiary.parrot.di
 import android.content.Context
 import androidx.room.Room
 import com.petdiary.parrot.data.local.AppSettingDao
+import com.petdiary.parrot.data.local.PersonalityPresetDao
+import com.petdiary.parrot.data.local.SpeciesDao
 import com.petdiary.parrot.data.local.DiaryDao
 import com.petdiary.parrot.data.local.ExpenseDao
 import com.petdiary.parrot.data.local.FeedLogDao
@@ -29,7 +31,7 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): ParrotDiaryDatabase =
         Room.databaseBuilder(context, ParrotDiaryDatabase::class.java, ParrotDiaryDatabase.NAME)
-            .addMigrations(ParrotDiaryDatabase.MIGRATION_1_2, ParrotDiaryDatabase.MIGRATION_2_3, ParrotDiaryDatabase.MIGRATION_3_4)
+            .addMigrations(ParrotDiaryDatabase.MIGRATION_1_2, ParrotDiaryDatabase.MIGRATION_2_3, ParrotDiaryDatabase.MIGRATION_3_4, ParrotDiaryDatabase.MIGRATION_4_5)
             .build()
 
     @Provides fun petDao(db: ParrotDiaryDatabase): PetDao = db.petDao()
@@ -43,4 +45,6 @@ object AppModule {
     @Provides fun petFoodPrefDao(db: ParrotDiaryDatabase): PetFoodPrefDao = db.petFoodPrefDao()
     @Provides fun placeDao(db: ParrotDiaryDatabase): PlaceDao = db.placeDao()
     @Provides fun appSettingDao(db: ParrotDiaryDatabase): AppSettingDao = db.appSettingDao()
+    @Provides fun speciesDao(db: ParrotDiaryDatabase): SpeciesDao = db.speciesDao()
+    @Provides fun personalityPresetDao(db: ParrotDiaryDatabase): PersonalityPresetDao = db.personalityPresetDao()
 }

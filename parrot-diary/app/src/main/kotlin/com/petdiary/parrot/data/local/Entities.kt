@@ -29,6 +29,10 @@ data class PetEntity(
     val avatarFocalX: Float? = null,          // 头像焦点 0..1（英雄卡宽幅背景取景对准此点）
     val avatarFocalY: Float? = null,
     val heroPath: String? = null,               // 首页英雄卡宽幅取景图（用户手裁，所见即所得）
+    val speciesName: String? = null,            // 品种名（随选择落库，展示免联表）
+    val refWeightMinG: Double? = null,          // 该鸟健康体重下限（克，选品种带入）
+    val refWeightMaxG: Double? = null,          // 该鸟健康体重上限
+    val accentColor: Int? = null,               // 自定义强调色 ARGB（空则按 accentIndex 查色板）
     val personalityTagsJson: String? = null,  // ["粘人","话痨"]
     val accentIndex: Int = 0,                 // 每鸟强调色 0..5
     val notes: String? = null,
@@ -196,6 +200,19 @@ data class PlaceEntity(
     val createdAt: Long,
     val updatedAt: Long,
 )
+
+@Entity(tableName = "species", indices = [Index("name")])
+data class SpeciesEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val weightMinG: Double? = null,            // 健康体重参考下限（克，可空）
+    val weightMaxG: Double? = null,
+    val isBuiltin: Boolean = false,            // 预置品种不可被自定义项顶替，但可删除
+)
+
+/** 个性标签预设（全局建议池，可增删；每只鸟实际标签存 pets.personalityTagsJson） */
+@Entity(tableName = "personality_presets")
+data class PersonalityPresetEntity(@PrimaryKey val tag: String)
 
 @Entity(tableName = "app_settings")
 data class AppSettingEntity(

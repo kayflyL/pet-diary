@@ -258,15 +258,15 @@ private fun HeroCard(
     onOpenDetail: () -> Unit,
 ) {
     val selBird = birds.firstOrNull { it.id == ui.selectedBirdId }
-    val bgPhoto = selBird?.avatarPath ?: photoPath
-    // 宽幅背景按头像焦点取景；无焦点时默认偏上（鸟头多在照片上半）
-    val heroAlignment = if (selBird?.avatarFocalX != null && selBird.avatarFocalY != null) {
-        BiasAlignment(
+    val bgPhoto = selBird?.heroPath ?: selBird?.avatarPath ?: photoPath
+    // 背景：手裁宽幅取景图（所见即所得）> 头像按焦点取景 > 默认偏上（鸟头多在照片上半）
+    val heroAlignment = when {
+        selBird?.heroPath != null -> BiasAlignment(0f, 0f)
+        selBird?.avatarFocalX != null && selBird.avatarFocalY != null -> BiasAlignment(
             (selBird.avatarFocalX * 2f - 1f).coerceIn(-1f, 1f),
             (selBird.avatarFocalY * 2f - 1f).coerceIn(-1f, 1f),
         )
-    } else {
-        BiasAlignment(0f, -0.5f)
+        else -> BiasAlignment(0f, -0.5f)
     }
     Box(
         modifier = Modifier

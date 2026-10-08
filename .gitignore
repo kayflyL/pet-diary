@@ -25,3 +25,12 @@ desktop.ini
 *.tmp
 ~$*
 .studio-config/
+
+# 会话调试产物（截图/补丁/db 副本一律进 .scratch/，不入库）
+/.scratch/
+/*.png
+/*.db
+/*.db-wal
+/*.db-shm
+/*.ui.xml
+/seed-photos/

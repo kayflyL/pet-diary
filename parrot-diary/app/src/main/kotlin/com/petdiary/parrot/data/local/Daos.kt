@@ -98,7 +98,16 @@ interface DiaryDao {
     @Query("SELECT * FROM diary_media ORDER BY createdAt DESC")
     fun observeAllMedia(): Flow<List<DiaryMediaEntity>>
 
-    @Query("SELECT * FROM diary_media WHERE entryId = :entryId ORDER BY sort")
+    @Query("SELECT * FROM diary_media WHERE id = :id")
+    suspend fun getMediaById(id: String): DiaryMediaEntity?
+
+    @Query("DELETE FROM diary_media WHERE id = :id")
+    suspend fun deleteMediaById(id: String)
+
+    @Query("DELETE FROM diary_entries WHERE id = :id")
+    suspend fun deleteEntryById(id: String)
+
+        @Query("SELECT * FROM diary_media WHERE entryId = :entryId ORDER BY sort")
     suspend fun mediaFor(entryId: String): List<DiaryMediaEntity>
 
     /** 照片墙：该鸟全部媒体（行迹地图按 lat/lng 过滤） */

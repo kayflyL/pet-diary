@@ -73,6 +73,20 @@ class DiaryRepository @Inject constructor(
         return entryId
     }
 
+    /** 删除单张照片：媒体记录与文件一并移除 */
+    suspend fun deleteMedia(mediaId: String) {
+        val m = dao.getMediaById(mediaId) ?: return
+        dao.deleteMediaById(mediaId)
+        java.io.File(m.path).delete()
+    }
+
+    /** 删除整条日记：先删挂载的照片文件（行随外键级联消失） */
+    suspend fun deleteEntry(entryId: String) {
+        dao.getEntryById(entryId) ?: return
+        dao.mediaFor(entryId).forEach { java.io.File(it.path).delete() }
+        dao.deleteEntryById(entryId)
+    }
+
     /** 编辑日记：更新文字与心情标签（照片集暂不在此改） */
     suspend fun updateEntryTextTags(entryId: String, text: String, tags: List<String>) {
         val entry = dao.getEntryById(entryId) ?: return

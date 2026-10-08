@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
@@ -97,32 +98,6 @@ fun TodayScreen(
     var sheet by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState()
     val context = LocalContext.current
-
-    var pendingCameraUri by remember { mutableStateOf<android.net.Uri?>(null) }
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-        val u = pendingCameraUri
-        pendingCameraUri = null
-        if (ok && u != null) vm.saveCameraPhoto(u)
-    }
-    val cameraPermLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) {
-            val f = java.io.File(context.cacheDir, "camera/${java.util.UUID.randomUUID()}.jpg").apply { parentFile?.mkdirs() }
-            val uri = androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".fileprovider", f)
-            pendingCameraUri = uri
-            cameraLauncher.launch(uri)
-        }
-    }
-    fun shoot() {
-        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        if (granted) {
-            val f = java.io.File(context.cacheDir, "camera/${java.util.UUID.randomUUID()}.jpg").apply { parentFile?.mkdirs() }
-            val uri = androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".fileprovider", f)
-            pendingCameraUri = uri
-            cameraLauncher.launch(uri)
-        } else {
-            cameraPermLauncher.launch(Manifest.permission.CAMERA)
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -215,8 +190,7 @@ fun TodayScreen(
                     modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp),
                 )
                 SheetRow("activity", "记体重", "默认上次 ${ui.latestWeightText ?: "—"}") { sheet = "weight" }
-                SheetRow("camera", "拍照", "随手拍进回忆 · 自动记录地点") { sheet = null; shoot() }
-                SheetRow("pen", "写日记", "文字 + 照片 + 心情标签") { sheet = "diary" }
+                SheetRow("camera", "发故事", "照片最多 9 张 · 可纯文字 · 自动记录地点") { sheet = "story" }
                 SheetRow("wallet", "记开销", "花销随手记") { sheet = "expense" }
                 Spacer(Modifier.height(16.dp))
             }
@@ -230,11 +204,11 @@ fun TodayScreen(
                 sheet = null
             },
         )
-        "diary" -> DiarySheet(
+        "story" -> StoryComposeSheet(
             birdName = ui.name,
             onDismiss = { sheet = null },
-            onSave = { text, tags, uris ->
-                vm.saveDiary(text, tags, uris)
+            onPublish = { text, tags, uris ->
+                vm.postStory(text, tags, uris)
                 sheet = null
             },
         )
@@ -679,55 +653,6 @@ private fun ExpenseSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
-@Composable
-private fun DiarySheet(
-    birdName: String,
-    onDismiss: () -> Unit,
-    onSave: (String, List<String>, List<android.net.Uri>) -> Unit,
-) {
-    var text by remember { mutableStateOf("") }
-    var tags by remember { mutableStateOf(setOf<String>()) }
-    var uris by remember { mutableStateOf<List<android.net.Uri>>(emptyList()) }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(6)) { result ->
-        if (result.isNotEmpty()) uris = result
-    }
-    val sheetState = rememberModalBottomSheetState()
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        SheetContent("$birdName · 写日记") {
-        OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
-            placeholder = { Text("今天的小${birdName.take(1)}…") },
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 3,
-        )
-        Text(
-            "从相册选择照片（最多 6 张，自动读取拍摄地点）",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = uris.isNotEmpty(), onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, label = { Text("选择照片 ${if (uris.isNotEmpty()) "(${uris.size})" else ""}") })
-        }
-        Text("心情标签", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            listOf("换羽", "洗澡", "放风", "精神好", "精神一般", "萎靡").forEach { tag ->
-                FilterChip(selected = tag in tags, onClick = { tags = if (tag in tags) tags - tag else tags + tag }, label = { Text(tag) })
-            }
-        }
-        Button(
-            onClick = { onSave(text, tags.toList(), uris); text = ""; uris = emptyList() },
-            enabled = text.isNotBlank() || uris.isNotEmpty(),
-            modifier = Modifier.fillMaxWidth().height(52.dp).padding(top = 14.dp),
-        ) {
-            Text("✓ 保存", fontWeight = FontWeight.Bold)
-        }
-        Spacer(Modifier.height(12.dp))
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -794,5 +719,123 @@ private fun SheetRow(ico: String, title: String, sub: String, onClick: () -> Uni
             Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** 发故事（朋友圈式）：照片最多 9 张（相册多选/现场拍）+ 可选文案 + 心情标签；纯文字也可发布 */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun StoryComposeSheet(
+    birdName: String,
+    onDismiss: () -> Unit,
+    onPublish: (text: String, tags: List<String>, uris: List<android.net.Uri>) -> Unit,
+) {
+    val context = LocalContext.current
+    var photos by remember { mutableStateOf(listOf<android.net.Uri>()) }
+    var text by remember { mutableStateOf("") }
+    var tags by remember { mutableStateOf(setOf<String>()) }
+    var showCamera by remember { mutableStateOf(false) }
+
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(9)) { result ->
+        if (result.isNotEmpty()) photos = (photos + result).distinct().take(9)
+    }
+    var pendingCameraUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val u = pendingCameraUri
+        pendingCameraUri = null
+        if (ok && u != null) photos = (photos + u).distinct().take(9)
+    }
+    val cameraPermLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            val f = java.io.File(context.cacheDir, "camera/${java.util.UUID.randomUUID()}.jpg").apply { parentFile?.mkdirs() }
+            val uri = androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".fileprovider", f)
+            pendingCameraUri = uri
+            cameraLauncher.launch(uri)
+        }
+    }
+    fun takeOne() {
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            val f = java.io.File(context.cacheDir, "camera/${java.util.UUID.randomUUID()}.jpg").apply { parentFile?.mkdirs() }
+            val uri = androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".fileprovider", f)
+            pendingCameraUri = uri
+            cameraLauncher.launch(uri)
+        } else {
+            cameraPermLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        SheetContent("$birdName · 发故事") {
+            Text(
+                "照片最多 9 张 · 只写文字也行 · 自动记录地点",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(10.dp))
+            // 照片区：已选缩略图（✕ 移除）＋ ＋照片 ＋ 拍一张
+            if (photos.isNotEmpty()) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 10.dp)) {
+                    itemsIndexed(photos) { idx, uri ->
+                        Box {
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(76.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentScale = ContentScale.Crop,
+                            )
+                            Text(
+                                "✕",
+                                fontSize = 11.sp,
+                                color = Color.White,
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(4.dp)
+                                    .background(Color(0x99000000), CircleShape)
+                                    .clickable { photos = photos.filterIndexed { i, _ -> i != idx } }
+                                    .padding(3.dp),
+                            )
+                        }
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+                FilterChip(
+                    selected = false,
+                    onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    label = { Text(if (photos.isEmpty()) "＋ 从相册选图" else "＋ 再选（${photos.size}/9）") },
+                )
+                FilterChip(selected = false, onClick = { takeOne() }, label = { Text("拍一张") })
+            }
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                placeholder = { Text("这一刻的想法（可纯文字）…") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+            )
+            Text("心情标签", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("换羽", "洗澡", "放风", "精神好", "精神一般", "萎靡").forEach { tag ->
+                    FilterChip(
+                        selected = tag in tags,
+                        onClick = { tags = if (tag in tags) tags - tag else tags + tag },
+                        label = { Text(tag) },
+                    )
+                }
+            }
+            Button(
+                onClick = { onPublish(text.trim(), tags.toList(), photos) },
+                enabled = text.isNotBlank() || photos.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth().height(52.dp).padding(top = 14.dp),
+            ) {
+                Text("✓ 发布", fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(12.dp))
+        }
     }
 }

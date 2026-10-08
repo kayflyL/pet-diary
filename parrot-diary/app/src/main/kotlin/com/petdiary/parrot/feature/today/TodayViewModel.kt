@@ -92,14 +92,10 @@ class TodayViewModel @Inject constructor(
         viewModelScope.launch { expenseRepository.add(selectedBird.value?.id, category, amount, note) }
     }
 
-    fun saveDiary(text: String, tags: List<String>, photoUris: List<android.net.Uri>) {
+    /** 发故事（朋友圈式）：文字/标签/照片任意组合，纯文字也可 */
+    fun postStory(text: String, tags: List<String>, photoUris: List<android.net.Uri>) {
         val pet = selectedBird.value ?: return
         viewModelScope.launch { diaryRepository.createEntry(pet.id, text, tags, photoUris) }
-    }
-
-    fun saveCameraPhoto(uri: android.net.Uri) {
-        val pet = selectedBird.value ?: return
-        viewModelScope.launch { diaryRepository.saveCameraPhoto(pet.id, uri) }
     }
 
     val birds: StateFlow<List<PetEntity>> = petRepository.observeActive()

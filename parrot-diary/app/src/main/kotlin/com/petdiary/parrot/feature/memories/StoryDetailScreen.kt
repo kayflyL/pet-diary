@@ -5,10 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,15 +14,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -53,6 +48,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.petdiary.parrot.data.DiaryRepository
 import com.petdiary.parrot.data.PetRepository
@@ -70,7 +66,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** 一条日记的展示态 */
+/** 一条日记的展示态：自己的照片 + 自己的文案（朋友圈式，条目为原子） */
 data class StoryEntryUi(
     val id: String,
     val petName: String,
@@ -78,11 +74,12 @@ data class StoryEntryUi(
     val text: String,
     val tags: List<String>,
     val timeText: String,
+    val photos: List<PhotoUi>,
 )
 
 data class StoryDayUi(
     val date: LocalDate,
-    val photos: List<PhotoUi>,
+    val photoCount: Int,
     val entries: List<StoryEntryUi>,
 )
 
@@ -109,23 +106,12 @@ class StoryDetailViewModel @Inject constructor(
         val dayEntries = entries
             .filter { it.happenedAt >= start && it.happenedAt < end }
             .sortedByDescending { it.happenedAt }
-        val ids = dayEntries.map { it.id }.toSet()
-        val dayMedia = media.filter { it.entryId in ids }.sortedByDescending { it.createdAt }
+        val dayMedia = media
+            .filter { m -> dayEntries.any { it.id == m.entryId } }
+            .sortedByDescending { it.createdAt }
         StoryDayUi(
             date = date,
-            photos = dayMedia.map { m ->
-                val entry = dayEntries.firstOrNull { it.id == m.entryId }
-                PhotoUi(
-                    id = m.id,
-                    path = m.path,
-                    petName = nameById[entry?.petId].orEmpty(),
-                    date = date,
-                    lat = m.lat,
-                    lng = m.lng,
-                    placeName = null,
-                    takenAt = m.takenAt ?: m.createdAt,
-                )
-            },
+            photoCount = dayMedia.size,
             entries = dayEntries.map { e ->
                 StoryEntryUi(
                     id = e.id,
@@ -139,6 +125,18 @@ class StoryDetailViewModel @Inject constructor(
                         ?.filter { it.isNotBlank() }
                         .orEmpty(),
                     timeText = Instant.ofEpochMilli(e.happenedAt).atZone(zone).toLocalTime().toString().take(5),
+                    photos = dayMedia.filter { it.entryId == e.id }.map { m ->
+                        PhotoUi(
+                            id = m.id,
+                            path = m.path,
+                            petName = nameById[e.petId].orEmpty(),
+                            date = date,
+                            lat = m.lat,
+                            lng = m.lng,
+                            placeName = null,
+                            takenAt = m.takenAt ?: m.createdAt,
+                        )
+                    },
                 )
             },
         )
@@ -148,12 +146,21 @@ class StoryDetailViewModel @Inject constructor(
     fun updateEntry(entryId: String, text: String, tags: List<String>) {
         viewModelScope.launch { writableDiaryRepository.updateEntryTextTags(entryId, text, tags) }
     }
+
+    /** 删除单张照片（记录与文件一并移除） */
+    fun deletePhoto(mediaId: String) {
+        viewModelScope.launch { writableDiaryRepository.deleteMedia(mediaId) }
+    }
+
+    /** 删除整条日记（连带其照片） */
+    fun deleteEntry(entryId: String) {
+        viewModelScope.launch { writableDiaryRepository.deleteEntry(entryId) }
+    }
 }
 
 /**
- * 故事详情 = 纸上的一页：巨型日期排版开头，照片横滑大图，日记为手账时间线
- * （时间在左轴、竖线相连、鸟名用各自强调色、铅笔编辑）。灵感：Day One 日视图 +
- * Google Photos 回忆页的大日期排版，融入 StoryTeller 纸面语言。
+ * 故事详情 = 纸上的一页：巨型日期排版开头，朋友圈式的条目块
+ * （每条故事 = 自己的照片 + 自己的文案，可删单张照片/整条），手账时间线呈现。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -178,7 +185,6 @@ fun StoryDetailScreen(onBack: () -> Unit, vm: StoryDetailViewModel = hiltViewMod
                 Box(Modifier.fillMaxSize().padding(padding))
                 return@Scaffold
             }
-            val pagerState = rememberPagerState(pageCount = { day.photos.size })
 
             Column(
                 Modifier
@@ -206,73 +212,15 @@ fun StoryDetailScreen(onBack: () -> Unit, vm: StoryDetailViewModel = hiltViewMod
                         modifier = Modifier.padding(top = 2.dp),
                     )
                     Text(
-                        buildString {
-                            append("${day.photos.size} 张照片")
-                            append(" · ")
-                            append("${day.entries.size} 条日记")
-                        },
+                        "${day.photoCount} 张照片 · ${day.entries.size} 条故事",
                         fontSize = 12.sp,
                         color = SubInk,
                         modifier = Modifier.padding(top = 4.dp),
                     )
                 }
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(20.dp))
 
-                // ── 照片：横滑大图 + 页码指示 ──
-                if (day.photos.isNotEmpty()) {
-                    HorizontalPager(
-                        state = pagerState,
-                        pageSpacing = 12.dp,
-                        contentPadding = PaddingValues(horizontal = 18.dp),
-                    ) { page ->
-                        val p = day.photos[page]
-                        AsyncImage(
-                            model = java.io.File(p.path),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(4f / 3f)
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(GreenInkSoft)
-                                .clickable {
-                                    viewer = ViewerState(day.photos, page)
-                                },
-                            contentScale = ContentScale.Crop,
-                        )
-                    }
-                    Row(
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 10.dp),
-                    ) {
-                        day.photos.forEachIndexed { i, _ ->
-                            val active = pagerState.currentPage == i
-                            Box(
-                                Modifier
-                                    .padding(horizontal = 3.dp)
-                                    .size(width = if (active) 18.dp else 6.dp, height = 6.dp)
-                                    .background(
-                                        if (active) GreenInk else SubInk.copy(alpha = 0.35f),
-                                        CircleShape,
-                                    ),
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(24.dp))
-                }
-
-                // ── 手账时间线：日记 ──
-                if (day.entries.isNotEmpty()) {
-                    Text(
-                        "手记",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = GreenInk,
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
-                    )
-                }
+                // ── 手账时间线：朋友圈式的条目块 ──
                 day.entries.forEachIndexed { i, e ->
                     val lineColor = SubInk.copy(alpha = 0.3f)
                     Row(
@@ -290,7 +238,7 @@ fun StoryDetailScreen(onBack: () -> Unit, vm: StoryDetailViewModel = hiltViewMod
                                     )
                                 }
                             }
-                            .padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
+                            .padding(start = 18.dp, end = 18.dp, bottom = 22.dp),
                         verticalAlignment = Alignment.Top,
                     ) {
                         Text(
@@ -306,7 +254,7 @@ fun StoryDetailScreen(onBack: () -> Unit, vm: StoryDetailViewModel = hiltViewMod
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
                                 Text(
-                                    e.petName.ifBlank { "日记" },
+                                    e.petName.ifBlank { "故事" },
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = e.accent,
@@ -324,12 +272,46 @@ fun StoryDetailScreen(onBack: () -> Unit, vm: StoryDetailViewModel = hiltViewMod
                                     LucideIcon("pen", SubInk, Modifier.size(14.dp))
                                 }
                             }
+                            // 照片：本条故事自己的
+                            if (e.photos.isNotEmpty()) {
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.padding(top = 10.dp),
+                                ) {
+                                    items(e.photos.size) { idx ->
+                                        val p = e.photos[idx]
+                                        Box {
+                                            AsyncImage(
+                                                model = java.io.File(p.path),
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .size(104.dp)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(GreenInkSoft)
+                                                    .clickable { viewer = ViewerState(e.photos, idx) },
+                                                contentScale = ContentScale.Crop,
+                                            )
+                                            Text(
+                                                "✕",
+                                                fontSize = 11.sp,
+                                                color = Color.White,
+                                                modifier = Modifier
+                                                    .align(Alignment.TopEnd)
+                                                    .padding(4.dp)
+                                                    .background(Color(0x99000000), CircleShape)
+                                                    .clickable { vm.deletePhoto(p.id) }
+                                                    .padding(3.dp),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                             if (e.text.isNotBlank()) {
                                 Text(
                                     e.text,
                                     fontSize = 15.sp,
                                     lineHeight = 23.sp,
-                                    modifier = Modifier.padding(top = 8.dp),
+                                    modifier = Modifier.padding(top = 10.dp),
                                 )
                             }
                             if (e.tags.isNotEmpty()) {
@@ -354,7 +336,7 @@ fun StoryDetailScreen(onBack: () -> Unit, vm: StoryDetailViewModel = hiltViewMod
                 }
                 if (day.entries.isEmpty()) {
                     Text(
-                        "这一天只有照片，没有写下文字",
+                        "这一天还没有故事",
                         style = MaterialTheme.typography.bodyMedium,
                         color = SubInk,
                         modifier = Modifier.padding(horizontal = 18.dp),
@@ -370,11 +352,14 @@ fun StoryDetailScreen(onBack: () -> Unit, vm: StoryDetailViewModel = hiltViewMod
 
         editing?.let { entry ->
             StoryEditDialog(
-                initialText = entry.text,
-                initialTags = entry.tags,
+                entry = entry,
                 onDismiss = { editing = null },
                 onSave = { text, tags ->
                     vm.updateEntry(entry.id, text, tags)
+                    editing = null
+                },
+                onDelete = {
+                    vm.deleteEntry(entry.id)
                     editing = null
                 },
             )
@@ -382,26 +367,37 @@ fun StoryDetailScreen(onBack: () -> Unit, vm: StoryDetailViewModel = hiltViewMod
     }
 }
 
-/** 日记编辑弹层：文字 + 心情标签（点击移除/新增） */
+/** 日记编辑弹层：文字 + 心情标签 + 删除整条（两步确认） */
 @Composable
 private fun StoryEditDialog(
-    initialText: String,
-    initialTags: List<String>,
+    entry: StoryEntryUi,
     onDismiss: () -> Unit,
     onSave: (String, List<String>) -> Unit,
+    onDelete: () -> Unit,
 ) {
-    var text by remember { mutableStateOf(initialText) }
-    var tags by remember { mutableStateOf(initialTags.toSet()) }
+    var text by remember { mutableStateOf(entry.text) }
+    var tags by remember { mutableStateOf(entry.tags.toSet()) }
     var newTag by remember { mutableStateOf("") }
+    var confirmDelete by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("编辑日记") },
+        title = { Text("编辑故事") },
         text = {
             Column {
+                if (entry.photos.isNotEmpty()) {
+                    Text(
+                        "照片 ${entry.photos.size} 张（在详情页单张移除）",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("这一刻的想法（可留空）") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
                     minLines = 3,
                 )
                 Text(
@@ -440,11 +436,23 @@ private fun StoryEditDialog(
                         ) { Text("添加") }
                     }
                 }
+                TextButton(
+                    onClick = {
+                        if (confirmDelete) onDelete() else confirmDelete = true
+                    },
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Text(
+                        if (confirmDelete) "再点一次确认删除（含 ${entry.photos.size} 张照片）" else "删除这条故事",
+                        color = Color(0xFFC53939),
+                        fontSize = 12.sp,
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
-                enabled = text.isNotBlank() || tags.isNotEmpty(),
+                enabled = text.isNotBlank() || tags.isNotEmpty() || entry.photos.isNotEmpty(),
                 onClick = { onSave(text.trim(), tags.toList()) },
             ) { Text("保存") }
         },
